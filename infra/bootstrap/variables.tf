@@ -9,3 +9,14 @@ variable "project" {
   type        = string
   default     = "spotify-stats"
 }
+
+variable "budget_email" {
+  description = "Email address that receives budget alerts."
+  type        = string
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly spend that triggers alerts. AWS Budgets bills in USD."
+  type        = number
+  default     = 1
+}

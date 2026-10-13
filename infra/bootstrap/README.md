@@ -8,6 +8,7 @@ machine with an admin AWS profile; CI never applies it.
 ```bash
 aws sso login --profile spotify-stats
 export AWS_PROFILE=spotify-stats
+cp bootstrap.example.tfvars terraform.tfvars   # then set budget_email
 terraform init
 terraform apply
 ```
