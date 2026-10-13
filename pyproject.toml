@@ -1,0 +1,31 @@
+[project]
+name = "spotify-stats"
+version = "0.1.0"
+description = "Spotify listening stats on a small AWS data platform"
+requires-python = ">=3.12,<3.13"
+dependencies = ["stats-ingest", "stats-api", "stats-jobs"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["ingest", "api", "jobs"]
+
+[tool.uv.sources]
+stats-ingest = { workspace = true }
+stats-api = { workspace = true }
+stats-jobs = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["ingest/tests", "api/tests", "jobs/tests"]
+addopts = "--import-mode=importlib"
