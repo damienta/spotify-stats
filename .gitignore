@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.example.tfvars
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Spotify exports and other personal data: never commit these
+data/*
+!data/.gitkeep
+my_spotify_data*/
+*.zip
+
+# Lambda build artifacts
+.build/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Xcode
+ios/**/xcuserdata/
+ios/**/DerivedData/
