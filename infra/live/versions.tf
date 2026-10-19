@@ -12,7 +12,7 @@ terraform {
   #   terraform init -backend-config="bucket=<state_bucket output>"
   backend "s3" {
     key          = "live/terraform.tfstate"
-    region       = "eu-west-2"
+    region       = "eu-north-1"
     encrypt      = true
     use_lockfile = true
   }
