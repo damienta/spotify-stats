@@ -10,7 +10,7 @@ See [docs/roadmap.md](docs/roadmap.md) for the stages.
 
 | Path | What lives there |
 | --- | --- |
-| `infra/bootstrap/` | One-off Terraform: remote state bucket, budget alarm, GitHub OIDC role |
+| `infra/bootstrap/` | One-off Terraform: remote state bucket and budget alarm |
 | `infra/live/` | Terraform for the app itself (S3, DynamoDB, Lambdas, scheduler) |
 | `ingest/` | Python: Spotify OAuth, the recently-played poller, GDPR export import |
 | `api/` | Python: FastAPI app served from Lambda |

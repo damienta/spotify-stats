@@ -6,11 +6,11 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 
 ## Step 0: Setup
 
-- [ ] AWS account: MFA on root, admin login via IAM Identity Center, £1 budget alarm
+- [x] AWS account: upgraded project with a spend limit, early cost controls and a $1 budget alarm
 - [ ] Spotify developer app (client ID/secret, redirect URI, user allow-list)
-- [ ] Request Spotify data: Extended streaming history + Account data (skip technical logs)
+- [x] Request Spotify data: Extended streaming history + Account data (skip technical logs)
 - [x] Repo scaffold: uv, ruff, pytest, pre-commit, CI
-- [ ] Terraform state bucket + GitHub OIDC so CI can run `terraform plan` on pull requests
+- [x] Terraform state bucket and budget alarm (GitHub OIDC is blocked by the account; see ADR 0002)
 
 ## Stage 1: Simple stats app
 
