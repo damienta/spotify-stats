@@ -29,3 +29,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["ingest/tests", "api/tests", "jobs/tests"]
 addopts = "--import-mode=importlib"
+
+[tool.ruff.lint.isort]
+known-first-party = ["stats_ingest", "stats_api", "stats_jobs"]
