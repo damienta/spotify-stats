@@ -14,11 +14,11 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 
 ## Stage 1: Simple stats app
 
-- [ ] Terraform: S3 (raw), DynamoDB (users, listens, stats), SSM parameters, Lambda roles
+- [ ] Terraform: S3 data bucket, DynamoDB (users, stats), SSM parameters, Lambda roles
 - [ ] Spotify OAuth Lambda; refresh tokens stored encrypted
-- [ ] Poller Lambda on EventBridge Scheduler (every 20 min): raw JSON to S3, deduped plays to DynamoDB
+- [ ] Poller Lambda on EventBridge Scheduler (every 20 min): raw JSON and listens to S3
 - [ ] GDPR import Lambda: S3 upload → parse → same raw format (drop `ip_addr`)
-- [ ] Hourly stats Lambda with DuckDB → per-user stats in DynamoDB
+- [ ] Hourly stats Lambda with DuckDB (dedupes on listen_id) → per-user stats in DynamoDB
 - [ ] FastAPI + Mangum on a Lambda Function URL
 - [ ] SwiftUI app with 3–4 stat screens
 
