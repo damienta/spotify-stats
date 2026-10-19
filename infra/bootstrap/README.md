@@ -1,6 +1,7 @@
 # Bootstrap
 
-One-off stack that creates what the other stacks depend on. Apply it by hand from your
+One-off stack that creates what the other stacks depend on: the Terraform state bucket and
+the monthly budget alarm. Apply it by hand from your
 machine with an admin AWS profile; CI never applies it.
 
 ## First run
@@ -18,15 +19,3 @@ terraform init -migrate-state -backend-config="bucket=$(terraform output -raw st
 ```
 
 Later runs only need `terraform init -backend-config="bucket=spotify-stats-tfstate-<account id>"`.
-
-## After applying
-
-Add two repository variables in GitHub (Settings → Secrets and variables → Actions → Variables)
-from the outputs:
-
-| Variable | Output |
-| --- | --- |
-| `AWS_PLAN_ROLE_ARN` | `github_plan_role_arn` |
-| `TF_STATE_BUCKET` | `state_bucket` |
-
-They aren't secrets: the role can only be assumed by this repository's workflows.

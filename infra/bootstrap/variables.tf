@@ -20,9 +20,3 @@ variable "monthly_budget_usd" {
   type        = number
   default     = 1
 }
-
-variable "github_repo" {
-  description = "GitHub repository (owner/name) allowed to assume the CI roles."
-  type        = string
-  default     = "damienta/spotify-stats"
-}

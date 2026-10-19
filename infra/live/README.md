@@ -8,4 +8,5 @@ terraform init -backend-config="bucket=$(terraform -chdir=../bootstrap output -r
 terraform plan
 ```
 
-CI runs `terraform plan` for this stack on every pull request.
+CI checks formatting and validates this stack on every pull request; `plan` and `apply` run
+locally (see docs/adr/0002-aws-account-constraints.md).
