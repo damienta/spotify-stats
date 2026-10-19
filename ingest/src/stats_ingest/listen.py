@@ -14,9 +14,6 @@ from typing import Any, Literal
 
 Source = Literal["export", "api"]
 
-# Spotify counts a stream once at least 30 seconds have been played.
-STREAM_THRESHOLD_MS = 30_000
-
 
 @dataclass(frozen=True, slots=True)
 class Listen:
