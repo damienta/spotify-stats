@@ -5,17 +5,15 @@ machine with an admin AWS profile; CI never applies it.
 
 ## First run
 
+This account only lets your console identity use AWS services, so apply from **AWS CloudShell**
+(bottom-left of the console):
+
 ```bash
-aws sso login --profile spotify-stats
-export AWS_PROFILE=spotify-stats
-cp bootstrap.example.tfvars terraform.tfvars   # then set budget_email
-terraform init
-terraform apply
+curl -fsSL https://raw.githubusercontent.com/damienta/spotify-stats/main/scripts/cloudshell-bootstrap.sh | BUDGET_EMAIL=you@example.com bash
 ```
 
-This stack starts on local state because it creates the state bucket. The local
-`terraform.tfstate` is git-ignored: keep it safe, or move it into the bucket once it exists
-by adding a `backend "s3"` block and running `terraform init -migrate-state`.
+The script installs Terraform, applies this stack on local state, then moves the state into the
+bucket it just created. Re-running it is safe: later runs use the remote state directly.
 
 ## After applying
 
