@@ -7,7 +7,7 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 ## Step 0: Setup
 
 - [x] AWS account: upgraded project with a spend limit, early cost controls and a $1 budget alarm
-- [ ] Spotify developer app (client ID/secret, redirect URI, user allow-list)
+- [x] Spotify developer app (client ID/secret, redirect URI, user allow-list)
 - [x] Request Spotify data: Extended streaming history + Account data (skip technical logs)
 - [x] Repo scaffold: uv, ruff, pytest, pre-commit, CI
 - [x] Terraform state bucket and budget alarm (GitHub OIDC is blocked by the account; see ADR 0002)
