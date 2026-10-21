@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stats_jobs.stats import connect, top_artists, totals
+from stats_jobs.stats import connect, top_artists, totals, write_parquet
 
 
 def listen(artist, ms_played, track_id="t1", played_at="2024-03-01T12:00:00Z"):
@@ -52,3 +52,29 @@ def test_top_artists_rank_by_streams_over_30_seconds(con):
 
 def test_top_artists_respects_the_limit(con):
     assert len(top_artists(con, limit=1)) == 1
+
+
+def test_duplicate_listen_ids_are_counted_once(tmp_path):
+    play = listen("A", 200_000)
+    path = tmp_path / "listens.jsonl"
+    path.write_text("\n".join(json.dumps(play) for _ in range(3)))
+
+    assert totals(connect(path)).streams == 1
+
+
+def test_export_row_wins_over_api_row_with_the_same_id(tmp_path):
+    api = listen("A", 200_000) | {"source": "api", "ms_played": None}
+    export = listen("A", 200_000)
+    path = tmp_path / "listens.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in (api, export)))
+
+    assert connect(path).execute("SELECT source, ms_played FROM listens").fetchall() == [
+        ("export", 200_000)
+    ]
+
+
+def test_parquet_round_trip_keeps_every_listen(con, tmp_path):
+    dest = tmp_path / "listens.parquet"
+
+    assert write_parquet(con, dest) == 5
+    assert totals(connect(dest)) == totals(con)

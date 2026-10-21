@@ -13,3 +13,4 @@ build-backend = "uv_build"
 
 [project.scripts]
 local-stats = "stats_jobs.cli:main"
+convert-listens = "stats_jobs.cli:convert"
