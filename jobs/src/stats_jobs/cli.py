@@ -9,6 +9,7 @@ from pathlib import Path
 
 from duckdb import DuckDBPyConnection
 
+from stats_jobs.behaviour import discoveries, most_skipped, on_repeat, skip_rate
 from stats_jobs.habits import listening_clock, minutes_by, streaks
 from stats_jobs.stats import connect, top, totals, write_parquet
 from stats_jobs.windows import LOCAL_TZ, Window, by_name
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> None:
             label = row.name if row.artist_name is None else f"{row.name} - {row.artist_name}"
             print(f"{rank:>3}. {label[:48]:<48} {row.streams:>7,} streams  {row.hours:>6,.1f} h")
     print_habits(con, window)
+    print_behaviour(con, window)
 
 
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -89,3 +91,25 @@ def convert(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def print_behaviour(con: DuckDBPyConnection, window: Window) -> None:
+    rate = skip_rate(con, window)
+    if rate is None:
+        return
+    print()
+    print(f"Skips: {rate:.0%} of plays ended before 30 seconds")
+    print("  most skipped artists (20+ plays)")
+    for row in most_skipped(con, "artist", window, limit=3):
+        print(f"    {row.name:<32} {row.skip_rate:>4.0%} of {row.plays:,} plays")
+    print()
+    print("Discovered in this window")
+    for d in discoveries(con, window, limit=5):
+        print(
+            f"  {d.artist_name:<32} first streamed {d.first_played}  {d.streams:>7,} streams since"
+        )
+    print()
+    print("On repeat (most streams of one track in a day)")
+    for r in on_repeat(con, window, limit=3):
+        label = f"{r.track_name} - {r.artist_name}"
+        print(f"  {label[:44]:<44} {r.streams:>3}x on {r.day}")
