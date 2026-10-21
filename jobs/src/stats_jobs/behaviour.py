@@ -74,7 +74,7 @@ def most_skipped(
         WHERE {IN_WINDOW} AND ms_played IS NOT NULL
         GROUP BY ALL
         HAVING count(*) >= $min_plays
-        ORDER BY rate DESC, plays DESC
+        ORDER BY rate DESC, plays DESC, 1, 2
         LIMIT $limit
         """,
         window_params(window, threshold=STREAM_THRESHOLD_MS, min_plays=min_plays, limit=limit),
@@ -141,7 +141,7 @@ def on_repeat(
         FROM listens
         WHERE {IN_WINDOW} AND ms_played >= $threshold
         GROUP BY ALL
-        ORDER BY streams DESC, day DESC
+        ORDER BY streams DESC, day DESC, track_name, artist_name
         LIMIT $limit
         """,
         window_params(window, threshold=STREAM_THRESHOLD_MS, limit=limit),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 from duckdb import DuckDBPyConnection
 
 from stats_jobs.behaviour import discoveries, most_skipped, on_repeat, skip_rate
+from stats_jobs.documents import build_documents, wrapped
 from stats_jobs.habits import listening_clock, minutes_by, streaks
 from stats_jobs.stats import connect, top, totals, write_parquet
 from stats_jobs.windows import LOCAL_TZ, Window, by_name
@@ -27,11 +29,15 @@ def main(argv: list[str] | None = None) -> None:
         default="all_time",
         help="4_weeks, 6_months, 12_months, all_time or year_YYYY (default: all_time)",
     )
+    parser.add_argument("--wrapped", type=int, metavar="YEAR", help="print a Wrapped for YEAR")
     args = parser.parse_args(argv)
     # Names hold characters (curly quotes, other scripts) the Windows code page can't encode.
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     con = connect(args.listens)
+    if args.wrapped:
+        print_wrapped(con, args.wrapped)
+        return
     window = by_name(args.window, now=datetime.now(UTC))
     t = totals(con, window)
     print(f"[{window.name}]")
@@ -113,3 +119,43 @@ def print_behaviour(con: DuckDBPyConnection, window: Window) -> None:
     for r in on_repeat(con, window, limit=3):
         label = f"{r.track_name} - {r.artist_name}"
         print(f"  {label[:44]:<44} {r.streams:>3}x on {r.day}")
+
+
+def print_wrapped(con: DuckDBPyConnection, y: int) -> None:
+    w = wrapped(con, y)
+    print(f"Your {y} Wrapped")
+    print(f"  {w['minutes']:,} minutes listened, {w['totals'].streams:,} streams")
+    if w["top_month"]:
+        print(f"  biggest month: {w['top_month'].start:%B} ({w['top_month'].minutes / 60:,.0f} h)")
+    for kind in ("artists", "tracks", "albums"):
+        print()
+        print(f"  Top {kind}")
+        for rank, row in enumerate(w[f"top_{kind}"], start=1):
+            label = row.name if row.artist_name is None else f"{row.name} - {row.artist_name}"
+            print(f"    {rank}. {label[:50]:<50} {row.streams:>6,} streams")
+    print()
+    print("  New to you this year")
+    for d in w["discoveries"]:
+        print(f"    {d.artist_name} (first streamed {d.first_played:%d %b})")
+    if w["on_repeat"]:
+        r = w["on_repeat"][0]
+        print()
+        print(f"  On repeat: {r.track_name} - {r.artist_name}, {r.streams}x on {r.day:%d %b}")
+
+
+def build(argv: list[str] | None = None) -> None:
+    """`build-stats`: compute every stat as JSON documents for one user."""
+    parser = argparse.ArgumentParser(description=build.__doc__)
+    parser.add_argument("--user", required=True)
+    parser.add_argument("--listens", type=Path, default=DEFAULT_PARQUET)
+    parser.add_argument("--out", type=Path, help="default: data/stats/<user>.json")
+    args = parser.parse_args(argv)
+    out = args.out or Path("data/stats") / f"{args.user}.json"
+
+    con = connect(args.listens, materialize=True)
+    documents = build_documents(con, args.user, now=datetime.now(UTC))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(documents, indent=1, ensure_ascii=False), encoding="utf-8")
+    largest = max(documents.values(), key=lambda d: len(json.dumps(d)))
+    print(f"Wrote {len(documents)} stat documents to {out} ({out.stat().st_size / 1e6:,.1f} MB)")
+    print(f"  largest: {largest['stat_name']} ({len(json.dumps(largest)) / 1e3:,.0f} KB)")

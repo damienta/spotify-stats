@@ -61,13 +61,16 @@ class TopRow:
     hours: float
 
 
-def connect(listens: Path) -> duckdb.DuckDBPyConnection:
+def connect(listens: Path, materialize: bool = False) -> duckdb.DuckDBPyConnection:
     """Open an in-memory DuckDB with the listens file exposed as a `listens` view.
 
     `listens` may be Parquet or JSON Lines. The view keeps one row per `listen_id`, so
     duplicates that reached storage are never counted twice (ADR 0003). When a play exists
     from both sources, the export row wins because it carries more detail. It also adds
     `played_at_local`, the play's time on the listener's clock.
+
+    With `materialize`, the deduplicated listens are loaded into memory once instead of being
+    re-read for every query: worth it when running many queries.
     """
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
@@ -78,7 +81,7 @@ def connect(listens: Path) -> duckdb.DuckDBPyConnection:
     source.create_view("listens_raw")
     con.execute(
         f"""
-        CREATE VIEW listens AS
+        CREATE {"TABLE" if materialize else "VIEW"} listens AS
         SELECT
             * REPLACE (played_at::TIMESTAMPTZ AS played_at),
             timezone('{LOCAL_TZ.key}', played_at::TIMESTAMPTZ) AS played_at_local
@@ -131,7 +134,8 @@ def top(
         FROM listens
         WHERE {IN_WINDOW}
         GROUP BY ALL
-        ORDER BY streams DESC, hours DESC, name
+        -- Sort on whole milliseconds: summed floats can differ in the last digit between runs.
+        ORDER BY streams DESC, sum(ms_played) DESC, name, artist
         LIMIT $limit
         """,
         window_params(window, threshold=STREAM_THRESHOLD_MS, limit=limit),
