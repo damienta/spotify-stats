@@ -7,14 +7,14 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from stats_jobs.stats import connect, top_artists, totals, write_parquet
+from stats_jobs.stats import connect, top, totals, write_parquet
 from stats_jobs.windows import by_name
 
 DEFAULT_PARQUET = Path("data/listens.parquet")
 
 
 def main(argv: list[str] | None = None) -> None:
-    """`local-stats`: print all-time totals and top artists from a listens file."""
+    """`local-stats`: print totals and top artists, tracks and albums for a time window."""
     parser = argparse.ArgumentParser(description=main.__doc__)
     parser.add_argument("listens", type=Path, nargs="?", default=DEFAULT_PARQUET)
     parser.add_argument("--top", type=int, default=10)
@@ -24,8 +24,8 @@ def main(argv: list[str] | None = None) -> None:
         help="4_weeks, 6_months, 12_months, all_time or year_YYYY (default: all_time)",
     )
     args = parser.parse_args(argv)
-    # Artist names can hold characters the Windows console code page can't print.
-    sys.stdout.reconfigure(errors="replace")
+    # Names hold characters (curly quotes, other scripts) the Windows code page can't encode.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     con = connect(args.listens)
     window = by_name(args.window, now=datetime.now(UTC))
@@ -34,10 +34,12 @@ def main(argv: list[str] | None = None) -> None:
     print(f"{t.hours:,.0f} hours listened ({t.hours / 24:,.1f} days)")
     print(f"{t.streams:,} streams of {t.tracks:,} tracks by {t.artists:,} artists")
     print(f"from {t.first_played[:10]} to {t.last_played[:10]}")
-    print()
-    print(f"Top {args.top} artists")
-    for rank, a in enumerate(top_artists(con, args.top, window), start=1):
-        print(f"{rank:>3}. {a.artist_name:<32} {a.streams:>7,} streams  {a.hours:>7,.1f} h")
+    for kind in ("artist", "track", "album"):
+        print()
+        print(f"Top {args.top} {kind}s")
+        for rank, row in enumerate(top(con, kind, args.top, window), start=1):
+            label = row.name if row.artist_name is None else f"{row.name} - {row.artist_name}"
+            print(f"{rank:>3}. {label[:48]:<48} {row.streams:>7,} streams  {row.hours:>6,.1f} h")
 
 
 def convert(argv: list[str] | None = None) -> None:

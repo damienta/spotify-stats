@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from stats_jobs.stats import connect, top_artists, totals, write_parquet
+from stats_jobs.stats import connect, top, totals, write_parquet
 
 
 def listen(artist, ms_played, track_id="t1", played_at="2024-03-01T12:00:00Z"):
@@ -44,14 +44,14 @@ def test_totals(con):
 
 
 def test_top_artists_rank_by_streams_over_30_seconds(con):
-    ranked = top_artists(con, limit=3)
+    ranked = top(con, "artist", limit=3)
 
-    assert [(a.artist_name, a.streams) for a in ranked] == [("A", 2), ("B", 1), ("C", 0)]
+    assert [(a.name, a.streams) for a in ranked] == [("A", 2), ("B", 1), ("C", 0)]
     assert ranked[1].hours == pytest.approx(1.0)
 
 
 def test_top_artists_respects_the_limit(con):
-    assert len(top_artists(con, limit=1)) == 1
+    assert len(top(con, "artist", limit=1)) == 1
 
 
 def test_duplicate_listen_ids_are_counted_once(tmp_path):

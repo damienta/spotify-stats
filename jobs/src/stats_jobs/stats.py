@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import duckdb
 
@@ -36,9 +37,21 @@ class Totals:
     last_played: str
 
 
+Kind = Literal["artist", "track", "album"]
+
+# What one row of each top list is. Tracks are keyed by name and artist rather than track_id,
+# so the single and album releases of the same song count as one track.
+TOP_COLUMNS: dict[Kind, tuple[str, str]] = {
+    "artist": ("artist_name", "NULL"),
+    "track": ("track_name", "artist_name"),
+    "album": ("album_name", "artist_name"),
+}
+
+
 @dataclass(frozen=True)
-class ArtistRow:
-    artist_name: str
+class TopRow:
+    name: str
+    artist_name: str | None
     streams: int
     hours: float
 
@@ -98,21 +111,24 @@ def totals(con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME) -> Totals:
     return Totals(*row)
 
 
-def top_artists(
-    con: duckdb.DuckDBPyConnection, limit: int = 10, window: Window = ALL_TIME
-) -> list[ArtistRow]:
+def top(
+    con: duckdb.DuckDBPyConnection, kind: Kind, limit: int = 10, window: Window = ALL_TIME
+) -> list[TopRow]:
+    """Most-streamed artists, tracks or albums in a window. Ties go to more hours played."""
+    name, artist = TOP_COLUMNS[kind]
     rows = con.execute(
         f"""
         SELECT
-            artist_name,
+            {name} AS name,
+            {artist} AS artist,
             count(*) FILTER (WHERE ms_played >= $threshold) AS streams,
             sum(ms_played) / 3600000.0 AS hours
         FROM listens
         WHERE {IN_WINDOW}
-        GROUP BY artist_name
-        ORDER BY streams DESC, hours DESC, artist_name
+        GROUP BY ALL
+        ORDER BY streams DESC, hours DESC, name
         LIMIT $limit
         """,
         window_params(window, limit=limit),
     ).fetchall()
-    return [ArtistRow(*r) for r in rows]
+    return [TopRow(*r) for r in rows]
