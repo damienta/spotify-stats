@@ -7,8 +7,11 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from duckdb import DuckDBPyConnection
+
+from stats_jobs.habits import listening_clock, minutes_by, streaks
 from stats_jobs.stats import connect, top, totals, write_parquet
-from stats_jobs.windows import by_name
+from stats_jobs.windows import LOCAL_TZ, Window, by_name
 
 DEFAULT_PARQUET = Path("data/listens.parquet")
 
@@ -40,6 +43,35 @@ def main(argv: list[str] | None = None) -> None:
         for rank, row in enumerate(top(con, kind, args.top, window), start=1):
             label = row.name if row.artist_name is None else f"{row.name} - {row.artist_name}"
             print(f"{rank:>3}. {label[:48]:<48} {row.streams:>7,} streams  {row.hours:>6,.1f} h")
+    print_habits(con, window)
+
+
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def print_habits(con: DuckDBPyConnection, window: Window) -> None:
+    s = streaks(con, today=datetime.now(LOCAL_TZ).date())
+    print()
+    print("Habits")
+    print(f"  longest streak  {s.longest.days:,} days ({s.longest.start} to {s.longest.end})")
+    print(f"  current streak  {s.current.days:,} days")
+
+    days = minutes_by(con, "day", window)
+    if not days:
+        return
+    busiest = max(days, key=lambda p: p.minutes)
+    print(f"  busiest day     {busiest.start} ({busiest.minutes / 60:,.1f} h)")
+    clock = listening_clock(con, window)
+    peak = max(clock, key=lambda c: c.minutes)
+    print(f"  peak hour       {WEEKDAYS[peak.weekday]} {peak.hour:02d}:00")
+
+    months = minutes_by(con, "month", window)[-12:]
+    print()
+    print("Hours per month")
+    widest = max(p.minutes for p in months)
+    for p in months:
+        bar = "#" * round(40 * p.minutes / widest)
+        print(f"  {p.start:%Y-%m}  {p.minutes / 60:>6,.0f} h  {bar}")
 
 
 def convert(argv: list[str] | None = None) -> None:

@@ -24,7 +24,7 @@ IN_WINDOW = (
 
 
 def window_params(window: Window, **extra: object) -> dict[str, object]:
-    return {"start": window.start, "end": window.end, "threshold": STREAM_THRESHOLD_MS, **extra}
+    return {"start": window.start, "end": window.end, **extra}
 
 
 @dataclass(frozen=True)
@@ -106,7 +106,7 @@ def totals(con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME) -> Totals:
         FROM listens
         WHERE {IN_WINDOW}
         """,
-        window_params(window),
+        window_params(window, threshold=STREAM_THRESHOLD_MS),
     ).fetchone()
     return Totals(*row)
 
@@ -129,6 +129,6 @@ def top(
         ORDER BY streams DESC, hours DESC, name
         LIMIT $limit
         """,
-        window_params(window, limit=limit),
+        window_params(window, threshold=STREAM_THRESHOLD_MS, limit=limit),
     ).fetchall()
     return [TopRow(*r) for r in rows]
