@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from stats_jobs.stats import connect, top_artists, totals
+from stats_jobs.stats import connect, top, totals
 from stats_jobs.windows import ALL_TIME, by_name, standard_windows, year
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
@@ -47,9 +47,9 @@ def test_rolling_windows_only_count_recent_plays(con):
 
 
 def test_top_artists_within_a_window(con):
-    [top] = top_artists(con, limit=1, window=by_name("4_weeks", NOW))
+    [first] = top(con, "artist", limit=1, window=by_name("4_weeks", NOW))
 
-    assert (top.artist_name, top.streams) == ("recent", 2)
+    assert (first.name, first.streams) == ("recent", 2)
 
 
 def test_year_window_uses_the_london_calendar(con):
