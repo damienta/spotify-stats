@@ -16,11 +16,16 @@ from stats_jobs.windows import ALL_TIME, LOCAL_TZ, Window
 # Spotify counts a stream once at least 30 seconds have been played.
 STREAM_THRESHOLD_MS = 30_000
 
-# Restricts a query to a `Window`; bind its bounds with `window_params`.
-IN_WINDOW = (
-    "played_at >= coalesce($start::TIMESTAMPTZ, '-infinity'::TIMESTAMPTZ) "
-    "AND played_at < coalesce($end::TIMESTAMPTZ, 'infinity'::TIMESTAMPTZ)"
-)
+
+def in_window(column: str = "played_at") -> str:
+    """SQL condition restricting `column` to a `Window`; bind its bounds with `window_params`."""
+    return (
+        f"{column} >= coalesce($start::TIMESTAMPTZ, '-infinity'::TIMESTAMPTZ) "
+        f"AND {column} < coalesce($end::TIMESTAMPTZ, 'infinity'::TIMESTAMPTZ)"
+    )
+
+
+IN_WINDOW = in_window()
 
 
 def window_params(window: Window, **extra: object) -> dict[str, object]:
