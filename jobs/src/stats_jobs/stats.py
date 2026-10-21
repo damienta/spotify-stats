@@ -32,10 +32,35 @@ class ArtistRow:
 
 
 def connect(listens: Path) -> duckdb.DuckDBPyConnection:
-    """Open an in-memory DuckDB with the listens file exposed as a `listens` view."""
+    """Open an in-memory DuckDB with the listens file exposed as a `listens` view.
+
+    `listens` may be Parquet or JSON Lines. The view keeps one row per `listen_id`, so
+    duplicates that reached storage are never counted twice (ADR 0003). When a play exists
+    from both sources, the export row wins because it carries more detail.
+    """
     con = duckdb.connect()
-    con.read_json(str(listens), format="newline_delimited").create_view("listens")
+    con.execute("SET TimeZone = 'UTC'")
+    if listens.suffix == ".parquet":
+        source = con.read_parquet(str(listens))
+    else:
+        source = con.read_json(str(listens), format="newline_delimited")
+    source.create_view("listens_raw")
+    con.execute(
+        """
+        CREATE VIEW listens AS
+        SELECT * REPLACE (played_at::TIMESTAMPTZ AS played_at)
+        FROM listens_raw
+        QUALIFY row_number() OVER (PARTITION BY listen_id ORDER BY source = 'export' DESC) = 1
+        """
+    )
     return con
+
+
+def write_parquet(con: duckdb.DuckDBPyConnection, dest: Path) -> int:
+    """Write the deduplicated listens to a Parquet file, oldest first. Returns the row count."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    con.sql("SELECT * FROM listens ORDER BY played_at").write_parquet(str(dest), compression="zstd")
+    return con.execute("SELECT count(*) FROM listens").fetchone()[0]
 
 
 def totals(con: duckdb.DuckDBPyConnection) -> Totals:
