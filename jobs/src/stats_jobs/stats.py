@@ -10,8 +10,20 @@ from pathlib import Path
 
 import duckdb
 
+from stats_jobs.windows import ALL_TIME, LOCAL_TZ, Window
+
 # Spotify counts a stream once at least 30 seconds have been played.
 STREAM_THRESHOLD_MS = 30_000
+
+# Restricts a query to a `Window`; bind its bounds with `window_params`.
+IN_WINDOW = (
+    "played_at >= coalesce($start::TIMESTAMPTZ, '-infinity'::TIMESTAMPTZ) "
+    "AND played_at < coalesce($end::TIMESTAMPTZ, 'infinity'::TIMESTAMPTZ)"
+)
+
+
+def window_params(window: Window, **extra: object) -> dict[str, object]:
+    return {"start": window.start, "end": window.end, "threshold": STREAM_THRESHOLD_MS, **extra}
 
 
 @dataclass(frozen=True)
@@ -36,7 +48,8 @@ def connect(listens: Path) -> duckdb.DuckDBPyConnection:
 
     `listens` may be Parquet or JSON Lines. The view keeps one row per `listen_id`, so
     duplicates that reached storage are never counted twice (ADR 0003). When a play exists
-    from both sources, the export row wins because it carries more detail.
+    from both sources, the export row wins because it carries more detail. It also adds
+    `played_at_local`, the play's time on the listener's clock.
     """
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
@@ -46,9 +59,11 @@ def connect(listens: Path) -> duckdb.DuckDBPyConnection:
         source = con.read_json(str(listens), format="newline_delimited")
     source.create_view("listens_raw")
     con.execute(
-        """
+        f"""
         CREATE VIEW listens AS
-        SELECT * REPLACE (played_at::TIMESTAMPTZ AS played_at)
+        SELECT
+            * REPLACE (played_at::TIMESTAMPTZ AS played_at),
+            timezone('{LOCAL_TZ.key}', played_at::TIMESTAMPTZ) AS played_at_local
         FROM listens_raw
         QUALIFY row_number() OVER (PARTITION BY listen_id ORDER BY source = 'export' DESC) = 1
         """
@@ -59,39 +74,45 @@ def connect(listens: Path) -> duckdb.DuckDBPyConnection:
 def write_parquet(con: duckdb.DuckDBPyConnection, dest: Path) -> int:
     """Write the deduplicated listens to a Parquet file, oldest first. Returns the row count."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    con.sql("SELECT * FROM listens ORDER BY played_at").write_parquet(str(dest), compression="zstd")
+    con.sql("SELECT * EXCLUDE (played_at_local) FROM listens ORDER BY played_at").write_parquet(
+        str(dest), compression="zstd"
+    )
     return con.execute("SELECT count(*) FROM listens").fetchone()[0]
 
 
-def totals(con: duckdb.DuckDBPyConnection) -> Totals:
+def totals(con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME) -> Totals:
     row = con.execute(
-        """
+        f"""
         SELECT
             count(*) FILTER (WHERE ms_played >= $threshold),
             coalesce(sum(ms_played), 0) / 3600000.0,
             count(DISTINCT artist_name),
             count(DISTINCT track_id),
-            min(played_at)::VARCHAR,
-            max(played_at)::VARCHAR
+            coalesce(min(played_at_local)::VARCHAR, ''),
+            coalesce(max(played_at_local)::VARCHAR, '')
         FROM listens
+        WHERE {IN_WINDOW}
         """,
-        {"threshold": STREAM_THRESHOLD_MS},
+        window_params(window),
     ).fetchone()
     return Totals(*row)
 
 
-def top_artists(con: duckdb.DuckDBPyConnection, limit: int = 10) -> list[ArtistRow]:
+def top_artists(
+    con: duckdb.DuckDBPyConnection, limit: int = 10, window: Window = ALL_TIME
+) -> list[ArtistRow]:
     rows = con.execute(
-        """
+        f"""
         SELECT
             artist_name,
             count(*) FILTER (WHERE ms_played >= $threshold) AS streams,
             sum(ms_played) / 3600000.0 AS hours
         FROM listens
+        WHERE {IN_WINDOW}
         GROUP BY artist_name
         ORDER BY streams DESC, hours DESC, artist_name
         LIMIT $limit
         """,
-        {"threshold": STREAM_THRESHOLD_MS, "limit": limit},
+        window_params(window, limit=limit),
     ).fetchall()
     return [ArtistRow(*r) for r in rows]
