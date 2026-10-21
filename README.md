@@ -28,3 +28,16 @@ uv sync
 uv run pytest
 pre-commit install
 ```
+
+## Try it on your own Spotify export
+
+Request **Extended streaming history** from Spotify (Account → Privacy → Download your data),
+unzip it into `data/` (git-ignored), then:
+
+```bash
+uv run parse-export data/my_spotify_data --user me   # export -> data/listens.jsonl
+uv run convert-listens                                # dedupe -> data/listens.parquet
+uv run local-stats --window 4_weeks                   # or 6_months, 12_months, all_time, year_2025
+uv run local-stats --wrapped 2025                     # your own Wrapped
+uv run build-stats --user me                          # every stat as JSON -> data/stats/me.json
+```
