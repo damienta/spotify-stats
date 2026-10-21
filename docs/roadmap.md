@@ -14,6 +14,8 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 
 ## Stage 1: Simple stats app
 
+- [x] `Listen` schema and export parser (`parse-export`)
+- [x] Stats job, run locally: Parquet, dedupe, time windows on London time, top lists, habits, skips, discoveries, Wrapped (`build-stats`, `local-stats`)
 - [ ] Terraform: S3 data bucket, DynamoDB (users, stats), SSM parameters, Lambda roles
 - [ ] Spotify OAuth Lambda; refresh tokens stored encrypted
 - [ ] Poller Lambda on EventBridge Scheduler (every 20 min): raw JSON and listens to S3
