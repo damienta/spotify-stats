@@ -33,6 +33,8 @@ class Listen:
     platform: str | None = None
     reason_start: str | None = None
     reason_end: str | None = None
+    # Only the API records this: the track's full length, used to estimate time listened.
+    track_duration_ms: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         row = asdict(self)
