@@ -3,7 +3,10 @@ name = "stats-ingest"
 version = "0.1.0"
 description = "Spotify OAuth, the recently-played poller and the GDPR export import"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.8,<0.13"]
