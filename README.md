@@ -41,3 +41,13 @@ uv run local-stats --window 4_weeks                   # or 6_months, 12_months, 
 uv run local-stats --wrapped 2025                     # your own Wrapped
 uv run build-stats --user me                          # every stat as JSON -> data/stats/me.json
 ```
+
+## Try the live Spotify API
+
+Create an app at developer.spotify.com (redirect URI `http://127.0.0.1:8000/callback`), put its
+client ID and secret in `.env` (copy `.env.example`), then:
+
+```bash
+uv run spotify-login    # approve in the browser; the token is saved to data/ (git-ignored)
+uv run fetch-recent     # your latest plays (Spotify keeps the last 50)
+```
