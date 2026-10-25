@@ -1,5 +1,6 @@
 import json
 
+import duckdb
 import pytest
 
 from stats_jobs.stats import connect, top, totals, write_parquet
@@ -78,3 +79,25 @@ def test_parquet_round_trip_keeps_every_listen(con, tmp_path):
 
     assert write_parquet(con, dest) == 5
     assert totals(connect(dest)) == totals(con)
+
+
+def test_api_plays_count_as_heard_in_full(tmp_path):
+    api = listen("A", None) | {"source": "api", "listen_id": "api1", "track_duration_ms": 180_000}
+    path = tmp_path / "listens.jsonl"
+    path.write_text(json.dumps(api))
+
+    t = totals(connect(path))
+
+    assert (t.streams, t.hours) == (1, 180_000 / 3_600_000)
+
+
+def test_parquet_with_an_untyped_empty_column_still_sums(tmp_path):
+    # A real export converted from JSON Lines stored the all-null track_duration_ms as JSON.
+    path = tmp_path / "export.parquet"
+    duckdb.sql(
+        "SELECT 'l1' AS listen_id, 'u1' AS user_id, TIMESTAMPTZ '2024-03-01 12:00:00+00' "
+        "AS played_at, 't' AS track_id, 'S' AS track_name, 'A' AS artist_name, 'B' AS album_name, "
+        "'export' AS source, 200000 AS ms_played, NULL::JSON AS track_duration_ms"
+    ).write_parquet(str(path))
+
+    assert totals(connect(path)).streams == 1
