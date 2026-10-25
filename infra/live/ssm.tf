@@ -8,7 +8,7 @@ locals {
 }
 
 resource "aws_ssm_parameter" "secret" {
-  for_each = toset(["spotify_client_id", "spotify_client_secret"])
+  for_each = toset(["spotify_client_id", "spotify_client_secret", "session_secret"])
 
   name  = "${local.ssm_prefix}/${each.key}"
   type  = "SecureString"
@@ -19,10 +19,10 @@ resource "aws_ssm_parameter" "secret" {
   }
 }
 
-# Where Spotify sends users back after they log in. The API's own URL replaces this once the
-# API Lambda exists.
+# Where Spotify sends users back after they log in: the API's callback. It must also be listed
+# under Redirect URIs in the Spotify developer dashboard.
 resource "aws_ssm_parameter" "spotify_redirect_uri" {
   name  = "${local.ssm_prefix}/spotify_redirect_uri"
   type  = "String"
-  value = "http://127.0.0.1:8000/callback"
+  value = "${aws_lambda_function_url.api.function_url}auth/callback"
 }
