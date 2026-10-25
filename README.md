@@ -51,3 +51,16 @@ client ID and secret in `.env` (copy `.env.example`), then:
 uv run spotify-login    # approve in the browser; the token is saved to data/ (git-ignored)
 uv run fetch-recent     # your latest plays (Spotify keeps the last 50)
 ```
+
+## Deploy to AWS
+
+Everything runs serverless in `eu-north-1` (see [docs/adr](docs/adr)): a poller every 20 minutes,
+a stats job every hour and an API on a Lambda function URL. Deploys run from your machine
+because the account blocks GitHub OIDC:
+
+```bash
+uv run python scripts/deploy.py      # build Lambdas, plan, confirm, apply, sync secrets, check
+```
+
+First time only: apply `infra/bootstrap` (see its README), then add the printed
+`spotify_redirect_uri` under Redirect URIs in the Spotify developer dashboard.
