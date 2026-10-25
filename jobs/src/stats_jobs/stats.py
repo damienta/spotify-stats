@@ -5,6 +5,7 @@ The same SQL will later run in the hourly stats Lambda, reading listens from S3 
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -61,31 +62,75 @@ class TopRow:
     hours: float
 
 
-def connect(listens: Path, materialize: bool = False) -> duckdb.DuckDBPyConnection:
-    """Open an in-memory DuckDB with the listens file exposed as a `listens` view.
+# The Listen schema (stats_ingest.listen) as DuckDB types, so JSON Lines files written by
+# different versions or sources always read the same way.
+LISTEN_COLUMNS = {
+    "listen_id": "VARCHAR",
+    "user_id": "VARCHAR",
+    "played_at": "TIMESTAMPTZ",
+    "track_id": "VARCHAR",
+    "track_name": "VARCHAR",
+    "artist_name": "VARCHAR",
+    "album_name": "VARCHAR",
+    "source": "VARCHAR",
+    "ms_played": "BIGINT",
+    "skipped": "BOOLEAN",
+    "shuffle": "BOOLEAN",
+    "platform": "VARCHAR",
+    "reason_start": "VARCHAR",
+    "reason_end": "VARCHAR",
+    "track_duration_ms": "BIGINT",
+}
 
-    `listens` may be Parquet or JSON Lines. The view keeps one row per `listen_id`, so
-    duplicates that reached storage are never counted twice (ADR 0003). When a play exists
-    from both sources, the export row wins because it carries more detail. It also adds
-    `played_at_local`, the play's time on the listener's clock.
+
+def _sql_list(paths: list[Path]) -> str:
+    return "[" + ", ".join("'" + str(p).replace("'", "''") + "'" for p in paths) + "]"
+
+
+def _source_sql(paths: list[Path]) -> str:
+    """SQL reading every listens file, Parquet and JSON Lines alike, as one table."""
+    parquet = [p for p in paths if p.suffix == ".parquet"]
+    json_lines = [p for p in paths if p.suffix != ".parquet"]
+    columns = "{" + ", ".join(f"'{k}': '{v}'" for k, v in LISTEN_COLUMNS.items()) + "}"
+    parts = []
+    if parquet:
+        parts.append(f"SELECT * FROM read_parquet({_sql_list(parquet)}, union_by_name = true)")
+    if json_lines:
+        parts.append(
+            f"SELECT * FROM read_json({_sql_list(json_lines)}, "
+            f"format = 'newline_delimited', columns = {columns})"
+        )
+    return " UNION ALL BY NAME ".join(parts)
+
+
+def connect(listens: Path | Sequence[Path], materialize: bool = False) -> duckdb.DuckDBPyConnection:
+    """Open an in-memory DuckDB with the listens exposed as a `listens` view.
+
+    `listens` is one file or several, each Parquet or JSON Lines. The view keeps one row per
+    `listen_id`, so duplicates that reached storage are never counted twice (ADR 0003). When a
+    play exists from both sources, the export row wins because it carries more detail. It also
+    adds `played_at_local`, the play's time on the listener's clock, and estimates
+    `ms_played` for API plays as the track's full length.
 
     With `materialize`, the deduplicated listens are loaded into memory once instead of being
     re-read for every query: worth it when running many queries.
     """
+    paths = [listens] if isinstance(listens, Path) else list(listens)
+    if not paths:
+        raise ValueError("no listens files to read")
     con = duckdb.connect()
     con.execute("SET TimeZone = 'UTC'")
-    if listens.suffix == ".parquet":
-        source = con.read_parquet(str(listens))
-    else:
-        source = con.read_json(str(listens), format="newline_delimited")
-    source.create_view("listens_raw")
     con.execute(
         f"""
         CREATE {"TABLE" if materialize else "VIEW"} listens AS
         SELECT
-            * REPLACE (played_at::TIMESTAMPTZ AS played_at),
+            * REPLACE (
+                played_at::TIMESTAMPTZ AS played_at,
+                -- The API doesn't report time listened: count its plays as heard in full.
+                coalesce(ms_played::BIGINT, track_duration_ms::BIGINT) AS ms_played
+            ),
             timezone('{LOCAL_TZ.key}', played_at::TIMESTAMPTZ) AS played_at_local
-        FROM listens_raw
+        FROM ({_source_sql(paths)})
         QUALIFY row_number() OVER (PARTITION BY listen_id ORDER BY source = 'export' DESC) = 1
         """
     )
