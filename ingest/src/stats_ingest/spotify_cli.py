@@ -29,6 +29,7 @@ from stats_ingest.spotify import (
     authorize_url,
     exchange_code,
 )
+from stats_ingest.storage import USERS_TABLE, UsersTable, new_user
 
 DEFAULT_TOKEN_FILE = Path("data/spotify_token.json")
 LOGIN_TIMEOUT_S = 300
@@ -139,3 +140,35 @@ def fetch_recent(argv: list[str] | None = None) -> None:
             for li in listens:
                 f.write(json.dumps(li.to_dict()) + "\n")
         print(f"Wrote {len(listens)} listens to {args.out}")
+
+
+def register_user(argv: list[str] | None = None) -> None:
+    """`register-user`: add your locally logged-in Spotify account to the users table.
+
+    The API's own login does this for app users; this is for testing the poller first.
+    """
+    import boto3
+
+    parser = argparse.ArgumentParser(description=register_user.__doc__)
+    parser.add_argument("--token-file", type=Path, default=DEFAULT_TOKEN_FILE)
+    args = parser.parse_args(argv)
+    load_dotenv()
+    config = SpotifyConfig.from_env()
+
+    with httpx.Client(timeout=30) as http:
+        client = SpotifyClient(
+            http,
+            config,
+            load_tokens(args.token_file),
+            on_refresh=lambda tokens: save_tokens(args.token_file, tokens),
+        )
+        me = client.me()
+        tokens = client.tokens
+
+    users = UsersTable(boto3.resource("dynamodb").Table(USERS_TABLE))
+    existing = users.get(me["id"])
+    user = new_user(me["id"], me.get("display_name") or me["id"], tokens)
+    if existing:
+        user.created_at, user.cursor_ms = existing.created_at, existing.cursor_ms
+    users.put(user)
+    print(f"{'Updated' if existing else 'Registered'} {user.display_name} ({user.user_id})")
