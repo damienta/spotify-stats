@@ -159,3 +159,24 @@ def build(argv: list[str] | None = None) -> None:
     largest = max(documents.values(), key=lambda d: len(json.dumps(d)))
     print(f"Wrote {len(documents)} stat documents to {out} ({out.stat().st_size / 1e6:,.1f} MB)")
     print(f"  largest: {largest['stat_name']} ({len(json.dumps(largest)) / 1e3:,.0f} KB)")
+
+
+def upload(argv: list[str] | None = None) -> None:
+    """`upload-export`: put a user's cleaned export listens in the S3 data bucket."""
+    import boto3
+
+    from stats_ingest.storage import data_bucket_name, export_listens_key
+
+    parser = argparse.ArgumentParser(description=upload.__doc__)
+    parser.add_argument("--user", required=True, help="the user's Spotify ID")
+    parser.add_argument("--listens", type=Path, default=DEFAULT_PARQUET)
+    args = parser.parse_args(argv)
+
+    users = connect(args.listens).execute("SELECT DISTINCT user_id FROM listens").fetchall()
+    if users != [(args.user,)]:
+        sys.exit(f"{args.listens} holds listens for {users}, not only {args.user!r}")
+
+    account = boto3.client("sts").get_caller_identity()["Account"]
+    bucket, key = data_bucket_name(account), export_listens_key(args.user)
+    boto3.client("s3").upload_file(str(args.listens), bucket, key)
+    print(f"Uploaded {args.listens} to s3://{bucket}/{key}")

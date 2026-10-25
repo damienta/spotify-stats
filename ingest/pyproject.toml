@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Spotify OAuth, the recently-played poller and the GDPR export import"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "boto3>=1.34",
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "tzdata>=2024.1",
@@ -17,3 +18,4 @@ build-backend = "uv_build"
 parse-export = "stats_ingest.cli:main"
 spotify-login = "stats_ingest.spotify_cli:login"
 fetch-recent = "stats_ingest.spotify_cli:fetch_recent"
+register-user = "stats_ingest.spotify_cli:register_user"
