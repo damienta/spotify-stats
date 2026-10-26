@@ -6,6 +6,7 @@ GET /me                                  who the token belongs to
 GET /me/overview?window=4_weeks          totals and top 5s for the home screen, in one call
 GET /me/stats                            the stat names available
 GET /me/stats/{stat}?window=4_weeks      one stat document, e.g. top_tracks, habits, wrapped
+GET /me/now-playing                      the track playing right now, live from Spotify
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import secrets
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
@@ -26,7 +28,13 @@ from fastapi.responses import RedirectResponse
 from mangum import Mangum
 
 from stats_api.sessions import SESSION_TTL_S, STATE_TTL_S, InvalidToken, sign, verify
-from stats_ingest.spotify import SpotifyClient, SpotifyConfig, authorize_url, exchange_code
+from stats_ingest.spotify import (
+    SpotifyClient,
+    SpotifyConfig,
+    SpotifyError,
+    authorize_url,
+    exchange_code,
+)
 from stats_ingest.storage import SSM_PREFIX, UsersTable, env, new_user, spotify_config_from_ssm
 
 # Where the login may send people back to: the Expo dev app, the built app, or a local page.
@@ -39,6 +47,13 @@ WINDOW = re.compile(
 )
 OVERVIEW_STATS = ("totals", "top_artists", "top_tracks", "top_albums")
 OVERVIEW_TOP = 5
+# The app asks for now playing every few seconds; answer repeats from memory so a warm Lambda
+# doesn't call Spotify more than once per user in this time.
+NOW_PLAYING_CACHE_S = 5
+# Spotify's answers when a user's grant is missing a scope, revoked or expired.
+RECONNECT_STATUSES = {400, 401, 403}
+
+_now_playing_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 @dataclass(frozen=True)
@@ -211,6 +226,58 @@ def overview(
     for name in OVERVIEW_STATS:
         data = json.loads(items[name]["data"]) if name in items else None
         result[name] = data[:OVERVIEW_TOP] if isinstance(data, list) else data
+    return result
+
+
+def _spotify(
+    user_id: str, settings: Settings, users: UsersTable, http: httpx.Client
+) -> SpotifyClient:
+    user = users.get(user_id)
+    if user is None:
+        raise HTTPException(404, "user not found")
+    return SpotifyClient(http, settings.spotify, user.tokens, on_refresh=users.token_saver(user))
+
+
+def _spotify_failed(e: SpotifyError) -> HTTPException:
+    if e.status in RECONNECT_STATUSES:
+        return HTTPException(403, "reconnect Spotify: log in again to allow this")
+    return HTTPException(502, "Spotify didn't answer, try again shortly")
+
+
+def track_summary(item: dict[str, Any]) -> dict[str, Any]:
+    """The parts of a Spotify track object the app shows."""
+    album = item.get("album") or {}
+    images = album.get("images") or []
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "artists": [a["name"] for a in item.get("artists", [])],
+        "album": album.get("name"),
+        "image": images[0]["url"] if images else None,
+        "duration_ms": item.get("duration_ms"),
+        "url": (item.get("external_urls") or {}).get("spotify"),
+    }
+
+
+@app.get("/me/now-playing")
+def now_playing(
+    user_id: UserIdDep, settings: SettingsDep, users: UsersDep, http: HttpDep
+) -> dict[str, Any]:
+    cached = _now_playing_cache.get(user_id)
+    if cached and time.monotonic() - cached[0] < NOW_PLAYING_CACHE_S:
+        return cached[1]
+    try:
+        playing = _spotify(user_id, settings, users, http).currently_playing()
+    except SpotifyError as e:
+        raise _spotify_failed(e) from None
+    result: dict[str, Any] = {"is_playing": False, "progress_ms": None, "track": None}
+    if playing:
+        result = {
+            "is_playing": bool(playing.get("is_playing")),
+            "progress_ms": playing.get("progress_ms"),
+            "track": track_summary(playing["item"]),
+        }
+    _now_playing_cache[user_id] = (time.monotonic(), result)
     return result
 
 

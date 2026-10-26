@@ -52,7 +52,7 @@ def poll_user(
         http,
         config,
         user.tokens,
-        on_refresh=lambda tokens: users.save_tokens(user.user_id, tokens),
+        on_refresh=users.token_saver(user),
     )
     items = client.recently_played(after_ms=user.cursor_ms)
     if not items:

@@ -6,6 +6,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from stats_api import app as app_module
 from stats_api.app import Settings, app, get_http, get_settings, get_stats_table, get_users
 from stats_api.sessions import sign
 from stats_ingest.spotify import SpotifyConfig, Tokens
@@ -18,11 +19,27 @@ SETTINGS = Settings(
 APP_REDIRECT = "exp://192.168.1.5:8081/--/auth"
 
 
+TRACK = {
+    "id": "t1",
+    "name": "Night drive",
+    "artists": [{"name": "Nova Lane"}],
+    "album": {"name": "Roads", "images": [{"url": "https://i.scdn.co/image/big"}]},
+    "duration_ms": 200_000,
+    "external_urls": {"spotify": "https://open.spotify.com/track/t1"},
+}
+# What the fake Spotify answers for each player endpoint; tests change these.
+PLAYER: dict[str, httpx.Response] = {}
+CALLS: list[str] = []
+
+
 def fake_spotify(request):
+    CALLS.append(request.url.path)
     if request.url.host == "accounts.spotify.com":
         return httpx.Response(
             200, json={"access_token": "a", "refresh_token": "r", "expires_in": 3600}
         )
+    if request.url.path in PLAYER:
+        return PLAYER[request.url.path]
     return httpx.Response(200, json={"id": "u1", "display_name": "Damien"})
 
 
@@ -35,6 +52,9 @@ def client(aws):
         with httpx.Client(transport=httpx.MockTransport(fake_spotify)) as c:
             yield c
 
+    PLAYER.clear()
+    CALLS.clear()
+    app_module._now_playing_cache.clear()
     app.dependency_overrides = {
         get_settings: lambda: SETTINGS,
         get_users: lambda: users,
@@ -165,3 +185,64 @@ def test_overview_bundles_totals_and_top_fives(client):
 
 def test_overview_before_the_first_build(client):
     assert client.get("/me/overview", headers=auth()).status_code == 404
+
+
+def put_user():
+    UsersTable(boto3.resource("dynamodb").Table("users")).put(
+        new_user("u1", "Damien", Tokens("a", "r", 9e9))
+    )
+
+
+NOW_PLAYING = "/v1/me/player/currently-playing"
+
+
+def test_now_playing_returns_the_track(client):
+    put_user()
+    PLAYER[NOW_PLAYING] = httpx.Response(
+        200, json={"is_playing": True, "progress_ms": 61_000, "item": TRACK}
+    )
+
+    body = client.get("/me/now-playing", headers=auth()).json()
+
+    assert body == {
+        "is_playing": True,
+        "progress_ms": 61_000,
+        "track": {
+            "id": "t1",
+            "name": "Night drive",
+            "artists": ["Nova Lane"],
+            "album": "Roads",
+            "image": "https://i.scdn.co/image/big",
+            "duration_ms": 200_000,
+            "url": "https://open.spotify.com/track/t1",
+        },
+    }
+
+
+def test_now_playing_when_nothing_plays(client):
+    put_user()
+    PLAYER[NOW_PLAYING] = httpx.Response(204)
+
+    body = client.get("/me/now-playing", headers=auth()).json()
+
+    assert body == {"is_playing": False, "progress_ms": None, "track": None}
+
+
+def test_now_playing_is_cached_for_a_few_seconds(client):
+    put_user()
+    PLAYER[NOW_PLAYING] = httpx.Response(204)
+
+    client.get("/me/now-playing", headers=auth())
+    client.get("/me/now-playing", headers=auth())
+
+    assert CALLS.count(NOW_PLAYING) == 1
+
+
+def test_now_playing_asks_to_reconnect_without_the_scope(client):
+    put_user()
+    PLAYER[NOW_PLAYING] = httpx.Response(403, json={"error": {"message": "Permissions missing"}})
+
+    response = client.get("/me/now-playing", headers=auth())
+
+    assert response.status_code == 403
+    assert "reconnect" in response.json()["detail"]
