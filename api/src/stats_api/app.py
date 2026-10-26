@@ -7,16 +7,19 @@ GET /me/overview?window=4_weeks          totals and top 5s for the home screen, 
 GET /me/stats                            the stat names available
 GET /me/stats/{stat}?window=4_weeks      one stat document, e.g. top_tracks, habits, wrapped
 GET /me/now-playing                      the track playing right now, live from Spotify
+GET /me/recent?limit=20                  recently played tracks, live from Spotify
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 import secrets
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlparse
@@ -28,6 +31,7 @@ from fastapi.responses import RedirectResponse
 from mangum import Mangum
 
 from stats_api.sessions import SESSION_TTL_S, STATE_TTL_S, InvalidToken, sign, verify
+from stats_ingest.poller import store_plays
 from stats_ingest.spotify import (
     SpotifyClient,
     SpotifyConfig,
@@ -35,7 +39,14 @@ from stats_ingest.spotify import (
     authorize_url,
     exchange_code,
 )
-from stats_ingest.storage import SSM_PREFIX, UsersTable, env, new_user, spotify_config_from_ssm
+from stats_ingest.storage import (
+    SSM_PREFIX,
+    User,
+    UsersTable,
+    env,
+    new_user,
+    spotify_config_from_ssm,
+)
 
 # Where the login may send people back to: the Expo dev app, the built app, or a local page.
 ALLOWED_REDIRECT_SCHEMES = {"exp", "exps", "spotifystats"}
@@ -52,6 +63,10 @@ OVERVIEW_TOP = 5
 NOW_PLAYING_CACHE_S = 5
 # Spotify's answers when a user's grant is missing a scope, revoked or expired.
 RECONNECT_STATUSES = {400, 401, 403}
+
+RECENT_MAX = 50
+
+log = logging.getLogger()
 
 _now_playing_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
@@ -79,6 +94,15 @@ def get_stats_table() -> Any:
     return boto3.resource("dynamodb").Table(env("STATS_TABLE"))
 
 
+@lru_cache
+def get_s3() -> Any:
+    return boto3.client("s3")
+
+
+def get_bucket() -> str:
+    return env("DATA_BUCKET")
+
+
 def get_http() -> Iterator[httpx.Client]:
     with httpx.Client(timeout=15) as http:
         yield http
@@ -88,6 +112,8 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 UsersDep = Annotated[UsersTable, Depends(get_users)]
 StatsDep = Annotated[Any, Depends(get_stats_table)]
 HttpDep = Annotated[httpx.Client, Depends(get_http)]
+S3Dep = Annotated[Any, Depends(get_s3)]
+BucketDep = Annotated[str, Depends(get_bucket)]
 
 app = FastAPI(title="spotify-stats")
 
@@ -229,12 +255,17 @@ def overview(
     return result
 
 
-def _spotify(
-    user_id: str, settings: Settings, users: UsersTable, http: httpx.Client
-) -> SpotifyClient:
+def _user(user_id: str, users: UsersTable) -> User:
     user = users.get(user_id)
     if user is None:
         raise HTTPException(404, "user not found")
+    return user
+
+
+def _spotify(
+    user_id: str, settings: Settings, users: UsersTable, http: httpx.Client
+) -> SpotifyClient:
+    user = _user(user_id, users)
     return SpotifyClient(http, settings.spotify, user.tokens, on_refresh=users.token_saver(user))
 
 
@@ -279,6 +310,37 @@ def now_playing(
         }
     _now_playing_cache[user_id] = (time.monotonic(), result)
     return result
+
+
+@app.get("/me/recent")
+def recent(
+    user_id: UserIdDep,
+    settings: SettingsDep,
+    users: UsersDep,
+    http: HttpDep,
+    s3: S3Dep,
+    bucket: BucketDep,
+    limit: Annotated[int, Query(ge=1, le=RECENT_MAX)] = 20,
+) -> dict[str, Any]:
+    """The last plays, newest first. Plays the poller hasn't stored yet are stored too, so
+    opening the app makes stats fresher."""
+    user = _user(user_id, users)
+    client = SpotifyClient(http, settings.spotify, user.tokens, on_refresh=users.token_saver(user))
+    try:
+        items = client.recently_played()
+    except SpotifyError as e:
+        raise _spotify_failed(e) from None
+    try:
+        store_plays(items, user, users=users, s3=s3, bucket=bucket, now=datetime.now(UTC))
+    except Exception:
+        # Showing the list matters more; the poller will store these plays anyway.
+        log.exception("storing recent plays for %s failed", user_id)
+    newest_first = sorted(items, key=lambda i: i["played_at"], reverse=True)[:limit]
+    return {
+        "items": [
+            {"played_at": i["played_at"], "track": track_summary(i["track"])} for i in newest_first
+        ]
+    }
 
 
 handler = Mangum(app, lifespan="off")

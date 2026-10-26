@@ -84,3 +84,13 @@ def test_token_saves_do_not_overwrite_newer_tokens(aws):
     saved = users.get("u1")
     assert (saved.access_token, saved.refresh_token) == ("a2", "r2")
     assert users.save_tokens("u1", Tokens("a4", "r4", 400), replacing="a2")
+
+
+def test_cursor_never_moves_back(aws):
+    users = UsersTable(boto3.resource("dynamodb").Table("users"))
+    users.put(new_user("u1", "Damien", Tokens("a", "r", 0)))
+
+    users.save_cursor("u1", 200)
+    users.save_cursor("u1", 100)
+
+    assert users.get("u1").cursor_ms == 200

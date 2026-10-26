@@ -10,6 +10,7 @@ S3 data bucket layout (see infra/live/s3.tf):
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from collections.abc import Callable, Iterable
@@ -124,11 +125,16 @@ class UsersTable:
         return save
 
     def save_cursor(self, user_id: str, cursor_ms: int) -> None:
-        self.table.update_item(
-            Key={"user_id": user_id},
-            UpdateExpression="SET cursor_ms = :c",
-            ExpressionAttributeValues={":c": cursor_ms},
-        )
+        """Move the cursor forward. It never moves back, even when the poller and the API
+        store plays at the same time."""
+        already_newer = self.table.meta.client.exceptions.ConditionalCheckFailedException
+        with contextlib.suppress(already_newer):
+            self.table.update_item(
+                Key={"user_id": user_id},
+                UpdateExpression="SET cursor_ms = :c",
+                ConditionExpression="attribute_not_exists(cursor_ms) OR cursor_ms < :c",
+                ExpressionAttributeValues={":c": cursor_ms},
+            )
 
 
 def _user_from_item(item: dict[str, Any]) -> User:

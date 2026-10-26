@@ -55,25 +55,49 @@ def poll_user(
         on_refresh=users.token_saver(user),
     )
     items = client.recently_played(after_ms=user.cursor_ms)
-    if not items:
-        return PollResult(user.user_id, 0)
+    return PollResult(
+        user.user_id, store_plays(items, user, users=users, s3=s3, bucket=bucket, now=now)
+    )
+
+
+def store_plays(
+    items: list[dict[str, Any]],
+    user: User,
+    *,
+    users: UsersTable,
+    s3: Any,
+    bucket: str,
+    now: datetime,
+) -> int:
+    """Store the recently-played items newer than the user's cursor, then move the cursor.
+
+    Shared by the poller and the API's recently played, which stores what it fetched so stats
+    stay fresh. If both store the same play, the stats job's dedupe on listen_id drops one.
+    Returns how many plays were stored.
+    """
+
+    def played_ms(item: dict[str, Any]) -> int:
+        return int(parse_played_at(item["played_at"]).timestamp() * 1000)
+
+    new = [i for i in items if user.cursor_ms is None or played_ms(i) > user.cursor_ms]
+    if not new:
+        return 0
 
     # Keep exactly what Spotify returned, then the cleaned listens.
     s3.put_object(
         Bucket=bucket,
         Key=raw_api_key(user.user_id, now),
-        Body=json.dumps(items).encode(),
+        Body=json.dumps(new).encode(),
         ContentType="application/json",
     )
     put_listens(
         s3,
         bucket,
         api_listens_key(user.user_id, now),
-        [listen_from_api(item, user.user_id) for item in items],
+        [listen_from_api(item, user.user_id) for item in new],
     )
-    newest = max(parse_played_at(item["played_at"]) for item in items)
-    users.save_cursor(user.user_id, int(newest.timestamp() * 1000))
-    return PollResult(user.user_id, len(items))
+    users.save_cursor(user.user_id, max(played_ms(i) for i in new))
+    return len(new)
 
 
 def poll_all(
