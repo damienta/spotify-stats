@@ -27,7 +27,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--window",
         default="all_time",
-        help="4_weeks, 6_months, 12_months, all_time or year_YYYY (default: all_time)",
+        help="4_weeks, 6_months, 12_months, all_time, today, this_week, this_month, this_year "
+        "or year_YYYY (default: all_time)",
     )
     parser.add_argument("--wrapped", type=int, metavar="YEAR", help="print a Wrapped for YEAR")
     args = parser.parse_args(argv)

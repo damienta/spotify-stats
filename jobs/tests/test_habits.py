@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -53,6 +53,12 @@ def test_minutes_by_day_week_and_month(con):
     assert weeks[0].start == date(2024, 1, 29)  # weeks start on Monday
     day = minutes_by(con, "day")[2]
     assert (day.start, day.minutes) == (date(2024, 2, 1), 2.0)
+
+
+def test_minutes_by_hour_keeps_the_time(con):
+    hours = minutes_by(con, "hour")
+
+    assert (hours[3].start, hours[3].minutes) == (datetime(2024, 2, 1, 21), 1.0)
 
 
 def test_minutes_by_respects_the_window(con):

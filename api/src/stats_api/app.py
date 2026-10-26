@@ -33,7 +33,10 @@ from stats_ingest.storage import SSM_PREFIX, UsersTable, env, new_user, spotify_
 ALLOWED_REDIRECT_SCHEMES = {"exp", "exps", "spotifystats"}
 ALLOWED_REDIRECT_HOSTS = {"localhost", "127.0.0.1"}
 STAT_NAME = re.compile(r"^[a-z_]+$")
-WINDOW = re.compile(r"^(4_weeks|6_months|12_months|all_time|year_\d{4}|\d{4})$")
+WINDOW = re.compile(
+    r"^(4_weeks|6_months|12_months|all_time|today|this_week|this_month|this_year"
+    r"|year_\d{4}|\d{4})$"
+)
 OVERVIEW_STATS = ("totals", "top_artists", "top_tracks", "top_albums")
 OVERVIEW_TOP = 5
 

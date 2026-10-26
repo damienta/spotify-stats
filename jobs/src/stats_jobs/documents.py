@@ -14,11 +14,18 @@ from typing import Any
 import duckdb
 
 from stats_jobs.behaviour import discoveries, most_skipped, on_repeat, skip_rate
-from stats_jobs.habits import listening_clock, minutes_by, streaks
+from stats_jobs.habits import Grain, listening_clock, minutes_by, streaks
 from stats_jobs.stats import top, totals
 from stats_jobs.windows import LOCAL_TZ, Window, standard_windows, year
 
 TOP_LIMIT = 50
+GRAINS: dict[str, Grain] = {
+    "today": "hour",
+    "this_week": "day",
+    "this_month": "day",
+    "4_weeks": "day",
+    "6_months": "day",
+}
 # DynamoDB items max out at 400 KB; stay well clear.
 MAX_DOCUMENT_BYTES = 300_000
 
@@ -34,8 +41,9 @@ def years_listened(con: duckdb.DuckDBPyConnection) -> list[int]:
 
 def window_stats(con: duckdb.DuckDBPyConnection, window: Window) -> dict[str, Any]:
     """Every per-window stat, keyed by stat name without the window suffix."""
-    # Daily detail for short windows; months for long ones so documents stay small.
-    grain = "day" if window.name in ("4_weeks", "6_months") else "month"
+    # Hourly detail for today, daily for short windows, monthly for long ones so documents
+    # stay small.
+    grain = GRAINS.get(window.name, "month")
     return {
         "totals": totals(con, window),
         "top_artists": top(con, "artist", TOP_LIMIT, window),

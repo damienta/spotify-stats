@@ -42,6 +42,10 @@ def test_documents_cover_every_window_year_and_stat(con):
         assert f"totals#{window}" in docs
         assert f"top_tracks#{window}" in docs
         assert f"listening_clock#{window}" in docs
+    for window in ("today", "this_week", "this_month", "this_year"):
+        assert f"totals#{window}" in docs
+    assert "minutes_by_hour#today" in docs
+    assert "minutes_by_day#this_month" in docs
     assert "minutes_by_day#4_weeks" in docs
     assert "minutes_by_month#all_time" in docs
     assert {"streaks", "wrapped#2025", "wrapped#2026"} <= docs.keys()
