@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -88,16 +88,40 @@ class UsersTable:
                 return [_user_from_item(i) for i in items]
             kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
-    def save_tokens(self, user_id: str, tokens: Tokens) -> None:
-        self.table.update_item(
-            Key={"user_id": user_id},
-            UpdateExpression="SET access_token = :a, refresh_token = :r, expires_at = :e",
-            ExpressionAttributeValues={
-                ":a": tokens.access_token,
-                ":r": tokens.refresh_token,
-                ":e": Decimal(str(tokens.expires_at)),
-            },
-        )
+    def save_tokens(self, user_id: str, tokens: Tokens, replacing: str | None = None) -> bool:
+        """Store refreshed tokens. With `replacing` (the access token they were refreshed from),
+        only if nobody else saved newer ones meanwhile: the poller and the API both refresh, and
+        the slower one mustn't overwrite fresh tokens with stale ones. Returns whether it saved.
+        """
+        condition = {}
+        values: dict[str, Any] = {
+            ":a": tokens.access_token,
+            ":r": tokens.refresh_token,
+            ":e": Decimal(str(tokens.expires_at)),
+        }
+        if replacing is not None:
+            condition = {"ConditionExpression": "access_token = :old"}
+            values[":old"] = replacing
+        try:
+            self.table.update_item(
+                Key={"user_id": user_id},
+                UpdateExpression="SET access_token = :a, refresh_token = :r, expires_at = :e",
+                ExpressionAttributeValues=values,
+                **condition,
+            )
+        except self.table.meta.client.exceptions.ConditionalCheckFailedException:
+            return False
+        return True
+
+    def token_saver(self, user: User) -> Callable[[Tokens], None]:
+        """An `on_refresh` callback for SpotifyClient that saves tokens without races."""
+        current = [user.access_token]
+
+        def save(tokens: Tokens) -> None:
+            self.save_tokens(user.user_id, tokens, replacing=current[0])
+            current[0] = tokens.access_token
+
+        return save
 
     def save_cursor(self, user_id: str, cursor_ms: int) -> None:
         self.table.update_item(

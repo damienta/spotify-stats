@@ -1,7 +1,7 @@
-"""A small Spotify Web API client: OAuth tokens and recently played tracks.
+"""A small Spotify Web API client: OAuth tokens, recently played and currently playing.
 
-Uses the Authorization Code flow. Only the `user-read-recently-played` scope is requested,
-so the app can read what someone played and nothing else.
+Uses the Authorization Code flow. Only read scopes for listening activity are requested, so
+the app can see what someone plays and nothing else.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import httpx
 AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 API_URL = "https://api.spotify.com/v1"
-SCOPES = ("user-read-recently-played",)
+SCOPES = ("user-read-recently-played", "user-read-currently-playing")
 
 # Refresh a little early so a token never expires mid-request.
 EXPIRY_MARGIN_S = 60
@@ -26,7 +26,9 @@ MAX_RETRIES = 3
 
 
 class SpotifyError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass(frozen=True)
@@ -77,7 +79,9 @@ def _token_request(
 ) -> dict[str, Any]:
     response = http.post(TOKEN_URL, data=form, auth=(config.client_id, config.client_secret))
     if response.status_code != 200:
-        raise SpotifyError(f"token request failed: {response.status_code} {response.text}")
+        raise SpotifyError(
+            f"token request failed: {response.status_code} {response.text}", response.status_code
+        )
     body = response.json()
     body["expires_at"] = now + body["expires_in"]
     return body
@@ -143,13 +147,23 @@ class SpotifyClient:
             if response.status_code == 429:
                 self.sleep(float(response.headers.get("Retry-After", "1")))
                 continue
+            if response.status_code == 204:
+                return {}
             if response.status_code != 200:
-                raise SpotifyError(f"GET {url} failed: {response.status_code} {response.text}")
+                raise SpotifyError(
+                    f"GET {url} failed: {response.status_code} {response.text}",
+                    response.status_code,
+                )
             return response.json()
         raise SpotifyError(f"GET {url} still rate limited after {MAX_RETRIES} retries")
 
     def me(self) -> dict[str, Any]:
         return self.get("/me")
+
+    def currently_playing(self) -> dict[str, Any] | None:
+        """The track playing now (or paused), or None when nothing is."""
+        playing = self.get("/me/player/currently-playing")
+        return playing if playing.get("item") else None
 
     def recently_played(self, after_ms: int | None = None) -> list[dict[str, Any]]:
         """Plays newer than `after_ms` (Unix ms), oldest first.

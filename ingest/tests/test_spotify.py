@@ -21,12 +21,12 @@ def fake_spotify(handler):
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_authorize_url_asks_only_for_recently_played():
+def test_authorize_url_asks_only_for_listening_activity():
     query = parse_qs(urlparse(authorize_url(CONFIG, state="xyz")).query)
 
     assert query["client_id"] == ["client-id"]
     assert query["redirect_uri"] == ["http://127.0.0.1:8000/callback"]
-    assert query["scope"] == ["user-read-recently-played"]
+    assert query["scope"] == ["user-read-recently-played user-read-currently-playing"]
     assert query["state"] == ["xyz"]
 
 
@@ -142,3 +142,22 @@ def test_refreshes_once_when_spotify_rejects_the_token():
     client = SpotifyClient(fake_spotify(handler), CONFIG, FRESH, clock=lambda: 0)
 
     assert client.me() == {"id": "me"}
+
+
+def test_currently_playing_is_none_when_nothing_plays():
+    def handler(request):
+        return httpx.Response(204)
+
+    assert (
+        SpotifyClient(fake_spotify(handler), CONFIG, FRESH, clock=lambda: 0).currently_playing()
+        is None
+    )
+
+
+def test_errors_carry_the_status():
+    def handler(request):
+        return httpx.Response(403, json={"error": "insufficient scope"})
+
+    with pytest.raises(SpotifyError) as e:
+        SpotifyClient(fake_spotify(handler), CONFIG, FRESH, clock=lambda: 0).currently_playing()
+    assert e.value.status == 403

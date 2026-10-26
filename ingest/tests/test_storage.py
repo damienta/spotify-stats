@@ -70,3 +70,17 @@ def test_spotify_config_comes_from_ssm(aws):
 def test_missing_ssm_parameters_are_named(aws):
     with pytest.raises(RuntimeError, match="spotify_client_secret"):
         spotify_config_from_ssm(boto3.client("ssm"))
+
+
+def test_token_saves_do_not_overwrite_newer_tokens(aws):
+    users = UsersTable(boto3.resource("dynamodb").Table("users"))
+    user = new_user("u1", "Damien", Tokens("a1", "r1", 100))
+    users.put(user)
+    poller_save, api_save = users.token_saver(user), users.token_saver(user)
+
+    poller_save(Tokens("a2", "r2", 200))
+    api_save(Tokens("a3", "r3", 300))  # refreshed from a1 too, but lost the race
+
+    saved = users.get("u1")
+    assert (saved.access_token, saved.refresh_token) == ("a2", "r2")
+    assert users.save_tokens("u1", Tokens("a4", "r4", 400), replacing="a2")
