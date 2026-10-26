@@ -22,6 +22,7 @@ from botocore.config import Config
 from stats_ingest.storage import UsersTable, env, listens_prefix
 from stats_jobs.documents import build_documents
 from stats_jobs.stats import connect
+from stats_jobs.windows import LOCAL_TZ
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -76,7 +77,9 @@ def run_user(
     key = {"user_id": user_id, "stat_name": BUILD_MARKER}
     previous = stats_table.get_item(Key=key).get("Item", {})
     unchanged = previous.get("marker") == marker
-    if unchanged and previous.get("built_on") == now.date().isoformat() and not force:
+    # "Today" and the other windows move at midnight on the listener's clock.
+    today = now.astimezone(LOCAL_TZ).date().isoformat()
+    if unchanged and previous.get("built_on") == today and not force:
         return JobResult(user_id, 0, 0, skipped=True)
 
     paths = []
@@ -120,7 +123,7 @@ def run_user(
         Item={
             **key,
             "marker": marker,
-            "built_on": now.date().isoformat(),
+            "built_on": today,
             "generated_at": now.isoformat(),
         }
     )

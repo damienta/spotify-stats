@@ -7,7 +7,7 @@ playback stopped, so a long play counts towards the hour it ended in.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 import duckdb
@@ -15,12 +15,12 @@ import duckdb
 from stats_jobs.stats import IN_WINDOW, STREAM_THRESHOLD_MS, window_params
 from stats_jobs.windows import ALL_TIME, Window
 
-Grain = Literal["day", "week", "month"]
+Grain = Literal["hour", "day", "week", "month"]
 
 
 @dataclass(frozen=True)
 class Period:
-    start: date
+    start: date | datetime  # a datetime for hours
     minutes: float
 
 
@@ -47,10 +47,11 @@ class Streaks:
 def minutes_by(
     con: duckdb.DuckDBPyConnection, grain: Grain, window: Window = ALL_TIME
 ) -> list[Period]:
-    """Minutes played per day, week (starting Monday) or month, oldest first."""
+    """Minutes played per hour, day, week (starting Monday) or month, oldest first."""
+    start = "date_trunc($grain, played_at_local)" + ("" if grain == "hour" else "::DATE")
     rows = con.execute(
         f"""
-        SELECT date_trunc($grain, played_at_local)::DATE, sum(ms_played) / 60000.0
+        SELECT {start}, sum(ms_played) / 60000.0
         FROM listens
         WHERE {IN_WINDOW}
         GROUP BY 1

@@ -26,13 +26,31 @@ def rolling(name: str, now: datetime, days: int) -> Window:
     return Window(name, start=now - timedelta(days=days), end=now)
 
 
+def calendar(name: str, now: datetime) -> Window:
+    """Today, this week (from Monday), this month or this year so far, on the listener's clock."""
+    local = now.astimezone(LOCAL_TZ)
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    starts = {
+        "today": midnight,
+        "this_week": midnight - timedelta(days=local.weekday()),
+        "this_month": midnight.replace(day=1),
+        "this_year": midnight.replace(month=1, day=1),
+    }
+    return Window(name, start=starts[name], end=now)
+
+
+CALENDAR_WINDOWS = ("today", "this_week", "this_month", "this_year")
+
+
 def standard_windows(now: datetime) -> list[Window]:
-    """The windows every stat is published for: 4 weeks, 6 months, 12 months and all time."""
+    """The windows every stat is published for: 4 weeks, 6 months, 12 months, all time, and
+    today, this week, this month and this year so far."""
     return [
         rolling("4_weeks", now, 28),
         rolling("6_months", now, 182),
         rolling("12_months", now, 365),
         ALL_TIME,
+        *(calendar(name, now) for name in CALENDAR_WINDOWS),
     ]
 
 
