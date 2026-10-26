@@ -21,8 +21,18 @@ resource "aws_iam_role_policy_attachment" "api_logs" {
 data "aws_iam_policy_document" "api" {
   statement {
     sid       = "ManageUsers"
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
     resources = [aws_dynamodb_table.users.arn]
+  }
+
+  # Recently played stores plays the poller hasn't yet, like the poller does.
+  statement {
+    sid     = "WritePlays"
+    actions = ["s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.data.arn}/raw/source=api/*",
+      "${aws_s3_bucket.data.arn}/listens/user=*/source=api/*",
+    ]
   }
 
   statement {
@@ -64,6 +74,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       USERS_TABLE = aws_dynamodb_table.users.name
       STATS_TABLE = aws_dynamodb_table.stats.name
+      DATA_BUCKET = aws_s3_bucket.data.bucket
     }
   }
 

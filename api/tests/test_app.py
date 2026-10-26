@@ -7,7 +7,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from stats_api import app as app_module
-from stats_api.app import Settings, app, get_http, get_settings, get_stats_table, get_users
+from stats_api.app import (
+    Settings,
+    app,
+    get_bucket,
+    get_http,
+    get_s3,
+    get_settings,
+    get_stats_table,
+    get_users,
+)
 from stats_api.sessions import sign
 from stats_ingest.spotify import SpotifyConfig, Tokens
 from stats_ingest.storage import UsersTable, new_user
@@ -60,6 +69,8 @@ def client(aws):
         get_users: lambda: users,
         get_stats_table: lambda: stats,
         get_http: http,
+        get_s3: lambda: boto3.client("s3"),
+        get_bucket: lambda: "data",
     }
     yield TestClient(app, follow_redirects=False)
     app.dependency_overrides = {}
@@ -246,3 +257,55 @@ def test_now_playing_asks_to_reconnect_without_the_scope(client):
 
     assert response.status_code == 403
     assert "reconnect" in response.json()["detail"]
+
+
+RECENT = "/v1/me/player/recently-played"
+
+
+def played(n, at):
+    return {"played_at": at, "track": {**TRACK, "id": f"t{n}", "name": f"Song {n}"}}
+
+
+def stored_keys():
+    listing = boto3.client("s3").list_objects_v2(Bucket="data", Prefix="listens/")
+    return [o["Key"] for o in listing.get("Contents", [])]
+
+
+def test_recent_is_newest_first_and_stores_new_plays(client):
+    put_user()
+    PLAYER[RECENT] = httpx.Response(
+        200,
+        json={
+            "items": [played(1, "2026-10-26T09:00:00.000Z"), played(2, "2026-10-26T09:04:00.000Z")],
+            "next": None,
+        },
+    )
+
+    body = client.get("/me/recent", params={"limit": 1}, headers=auth()).json()
+
+    assert body == {
+        "items": [
+            {
+                "played_at": "2026-10-26T09:04:00.000Z",
+                "track": {
+                    "id": "t2",
+                    "name": "Song 2",
+                    "artists": ["Nova Lane"],
+                    "album": "Roads",
+                    "image": "https://i.scdn.co/image/big",
+                    "duration_ms": 200_000,
+                    "url": "https://open.spotify.com/track/t1",
+                },
+            }
+        ]
+    }
+    assert len(stored_keys()) == 1
+    users = UsersTable(boto3.resource("dynamodb").Table("users"))
+    assert users.get("u1").cursor_ms == 1793005440000
+
+    client.get("/me/recent", headers=auth())  # nothing new the second time
+    assert len(stored_keys()) == 1
+
+
+def test_recent_rejects_silly_limits(client):
+    assert client.get("/me/recent", params={"limit": 500}, headers=auth()).status_code == 422
