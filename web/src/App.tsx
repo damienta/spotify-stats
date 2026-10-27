@@ -1,14 +1,19 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Nav, type Tab } from './components/Nav'
+import { Skeleton } from './components/States'
 import { Button } from './components/ui/button'
 import { finishLogin, getToken, logout } from './lib/api'
-import { Home } from './screens/Home'
-import { Login } from './screens/Login'
-import { Stats } from './screens/Stats'
-import { Top } from './screens/Top'
+
+// Each screen is its own download, so the first visit only loads what it shows: the login
+// screen's WebGL aurora and the Stats charts aren't fetched until they're needed.
+const Home = lazy(() => import('./screens/Home').then((m) => ({ default: m.Home })))
+const Login = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })))
+const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })))
+const Top = lazy(() => import('./screens/Top').then((m) => ({ default: m.Top })))
 
 const TAB_KEY = 'spotify-stats.tab'
 // Runs once, before the first render: picks up ?token= after "Log in with Spotify".
@@ -23,10 +28,26 @@ function savedTab(): Tab {
   }
 }
 
+function Loading() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-12 w-64" />
+      <Skeleton className="h-28" />
+      <Skeleton className="h-64" />
+    </div>
+  )
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>(savedTab)
 
-  if (!getToken()) return <Login error={loginError} />
+  if (!getToken()) {
+    return (
+      <Suspense fallback={null}>
+        <Login error={loginError} />
+      </Suspense>
+    )
+  }
 
   const go = (next: Tab) => {
     setTab(next)
@@ -39,36 +60,52 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* A soft green glow behind the top of every page. */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(60%_80%_at_30%_0%,rgba(29,185,84,0.22),transparent_70%)]" />
-      <Nav tab={tab} onChange={go} />
-      {/* Logout stays in the top corner on every tab. */}
-      <Button
-        variant="glass"
-        size="icon"
-        onClick={logout}
-        aria-label="Log out"
-        title="Log out"
-        className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:top-6 md:right-6"
-      >
-        <LogOut className="size-4" />
-      </Button>
-      <main className="relative mx-auto max-w-3xl px-4 pt-6 pb-32 md:pl-64 md:pb-12 lg:max-w-5xl">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            {tab === 'home' && <Home onSeeAll={() => go('top')} />}
-            {tab === 'top' && <Top />}
-            {tab === 'stats' && <Stats />}
-          </motion.div>
-        </AnimatePresence>
-      </main>
-    </div>
+    // Animations follow the device's "reduce motion" setting.
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen">
+        <a
+          href="#main"
+          className="sr-only z-30 rounded-full bg-accent px-4 py-2 font-semibold text-black focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
+        >
+          Skip to content
+        </a>
+        {/* A soft green glow behind the top of every page. */}
+        <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(60%_80%_at_30%_0%,rgba(29,185,84,0.22),transparent_70%)]" />
+        <Nav tab={tab} onChange={go} />
+        {/* Logout stays in the top corner on every tab. */}
+        <Button
+          variant="glass"
+          size="icon"
+          onClick={logout}
+          aria-label="Log out"
+          title="Log out"
+          className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:top-6 md:right-6"
+        >
+          <LogOut className="size-4" />
+        </Button>
+        <main
+          id="main"
+          className="relative mx-auto max-w-3xl px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-32 md:pl-64 md:pb-12 lg:max-w-5xl"
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ErrorBoundary key={tab}>
+                <Suspense fallback={<Loading />}>
+                  {tab === 'home' && <Home onSeeAll={() => go('top')} />}
+                  {tab === 'top' && <Top />}
+                  {tab === 'stats' && <Stats />}
+                </Suspense>
+              </ErrorBoundary>
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
+    </MotionConfig>
   )
 }

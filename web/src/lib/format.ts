@@ -22,7 +22,7 @@ export function clock(ms: number): string {
 
 export function ago(iso: string, now = Date.now()): string {
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
-  if (minutes < 1) return 'now'
+  if (minutes < 1) return '<1m'
   if (minutes < 60) return `${minutes}m`
   const hours = Math.round(minutes / 60)
   return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`

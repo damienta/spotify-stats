@@ -14,7 +14,16 @@ export function Artwork({
 }) {
   const shape = round ? 'rounded-full' : 'rounded-md'
   if (src) {
-    return <img src={src} alt="" className={cn('aspect-square object-cover', shape, className)} />
+    // Lazy: pictures further down a long list only load when scrolled near.
+    return (
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className={cn('aspect-square bg-white/5 object-cover', shape, className)}
+      />
+    )
   }
   const initials = name
     .split(/\s+/)
