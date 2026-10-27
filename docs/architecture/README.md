@@ -1,7 +1,8 @@
 # Architecture
 
 How the Spotify stats app works today (Stage 1), end to end. The reasons behind each choice
-are in [decisions.md](decisions.md); the formal records are in [../adr](../adr).
+are in [decisions.md](decisions.md), how pictures are cached is in [caching.md](caching.md),
+and the formal records are in [../adr](../adr).
 
 ## The big picture
 
@@ -112,8 +113,9 @@ real secrets never sit in Terraform state.
    | `year_2020` … | 1 Jan | next 1 Jan |
 
    9 stats × 15 windows + streaks + one Wrapped per year = 143 documents for 7 years of history.
-4. **Pictures.** Add `image` and `url` to top-list rows from the catalogue (at most 300 new
-   lookups per run).
+4. **Pictures.** Add `image` and `url` to top lists, on repeat and new to you, from the shared
+   catalogue file; only items it hasn't seen are looked up on Spotify (at most 500 a run, #1s
+   first, paused while Spotify says to wait). See [caching.md](caching.md).
 5. **Write.** Overwrite each document in DynamoDB; merge the poll files into
    `compacted.parquet` and delete only the files that were merged.
 
@@ -121,6 +123,21 @@ The 11 functions: `totals`, `top` (artists, tracks, albums), `minutes_by` (hour,
 `listening_clock`, `streaks` (gaps and islands), `skip_rate`, `most_skipped`, `discoveries`,
 `on_repeat`, plus `wrapped` which reuses them for one year. Lists rank by **time played**, then
 streams. A stream is a play of at least 30 seconds; a skip is a play under 30 seconds.
+
+## How a screen gets its data
+
+Opening Top on "4 weeks", for example:
+
+1. The browser asks `/api/me/stats/top_tracks?window=4_weeks` with your session token.
+2. The Vite dev server on your PC forwards it to the API Lambda.
+3. The API checks the token's signature (that's you), does **one DynamoDB read** of
+   (you, `top_tracks#4_weeks`), and returns the JSON as it is: 100 rows with minutes, streams,
+   picture addresses and links.
+4. React draws the first 10 rows; "Show top 100" reveals the rest, which are already loaded.
+   Pictures load from Spotify's servers as they scroll into view.
+
+Nothing is calculated and Spotify isn't called. Only now playing and recently played go to
+Spotify live.
 
 ## The API
 
