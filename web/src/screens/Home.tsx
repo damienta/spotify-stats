@@ -1,14 +1,11 @@
-import { LogOut } from 'lucide-react'
-
 import { Artwork } from '@/components/Artwork'
+import { Minutes } from '@/components/Minutes'
 import { MinutesChart } from '@/components/MinutesChart'
 import { NowPlayingCard } from '@/components/NowPlayingCard'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
-import { Button } from '@/components/ui/button'
-import { logout } from '@/lib/api'
-import { ago, count, duration, greeting } from '@/lib/format'
+import { ago, count, greeting } from '@/lib/format'
 import { fillPeriod } from '@/lib/periods'
 import { useMe, useRecent, useStat } from '@/lib/queries'
 import type { Period, TopRow, Totals } from '@/lib/types'
@@ -16,14 +13,12 @@ import type { Period, TopRow, Totals } from '@/lib/types'
 function Header() {
   const me = useMe()
   return (
-    <header className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-muted">{greeting()}</p>
-        <h1 className="text-2xl font-extrabold tracking-tight">{me.data?.display_name ?? ' '}</h1>
-      </div>
-      <Button variant="glass" size="icon" onClick={logout} aria-label="Log out">
-        <LogOut className="size-4" />
-      </Button>
+    <header className="pr-12">
+      <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+        {greeting()},
+        <br />
+        <span className="text-accent">{me.data?.display_name ?? ' '}</span>
+      </h1>
     </header>
   )
 }
@@ -37,17 +32,48 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Today's top artist or track, with its picture. */
+function TodayTop({ label, row, round }: { label: string; row?: TopRow; round?: boolean }) {
+  return (
+    <SpotlightCard className="flex items-center gap-3">
+      {row ? (
+        <>
+          <Artwork src={row.image} name={row.name} round={round} className="size-14 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs text-muted">{label}</p>
+            <p className="truncate font-bold">{row.name}</p>
+            <p className="truncate text-xs text-muted">
+              <Minutes value={row.hours * 60} hours={false} />
+              {row.artist_name && ` · ${row.artist_name}`}
+            </p>
+          </div>
+        </>
+      ) : (
+        <div>
+          <p className="text-xs text-muted">{label}</p>
+          <p className="font-bold">–</p>
+        </div>
+      )}
+    </SpotlightCard>
+  )
+}
+
 function Today() {
   const totals = useStat<Totals>('totals', 'today')
   const hours = useStat<Period[]>('minutes_by_hour', 'today')
+  const artists = useStat<TopRow[]>('top_artists', 'today')
+  const tracks = useStat<TopRow[]>('top_tracks', 'today')
+  const t = totals.data
   return (
     <Section title="Today">
       <div className="grid grid-cols-2 gap-3">
-        <Metric label="Minutes" value={totals.data ? count(totals.data.hours * 60) : '–'} />
-        <Metric label="Streams" value={totals.data ? count(totals.data.streams) : '–'} />
+        <Metric label="Minutes" value={t ? count(t.hours * 60) : '–'} />
+        <Metric label="Streams" value={t ? count(t.streams) : '–'} />
+        <Metric label="Artists" value={t ? count(t.artists) : '–'} />
+        <Metric label="Tracks" value={t ? count(t.tracks) : '–'} />
       </div>
       <SpotlightCard>
-        <p className="mb-2 text-xs text-muted">By hour</p>
+        <p className="mb-2 text-xs text-muted">Minutes by hour</p>
         {hours.isError ? (
           <Problem error={hours.error} onRetry={() => hours.refetch()} />
         ) : hours.data ? (
@@ -56,6 +82,10 @@ function Today() {
           <Skeleton className="h-28" />
         )}
       </SpotlightCard>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <TodayTop label="Top artist today" row={artists.data?.[0]} round />
+        <TodayTop label="Top track today" row={tracks.data?.[0]} />
+      </div>
     </Section>
   )
 }
@@ -80,14 +110,27 @@ function TopArtists({ onSeeAll }: { onSeeAll: () => void }) {
         <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
           {top.data
             ? top.data.slice(0, 10).map((a) => (
-                <div key={a.name} className="w-24 shrink-0 text-center">
-                  <Artwork name={a.name} round className="size-24 text-xl" />
+                <a
+                  key={a.name}
+                  href={a.url ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group w-28 shrink-0 text-center"
+                >
+                  <Artwork
+                    src={a.image}
+                    name={a.name}
+                    round
+                    className="size-28 text-xl transition-transform group-hover:scale-105"
+                  />
                   <p className="mt-2 truncate text-sm font-semibold">{a.name}</p>
-                  <p className="text-xs text-muted">{duration(a.hours * 60)}</p>
-                </div>
+                  <p className="text-xs text-muted">
+                    <Minutes value={a.hours * 60} hours={false} />
+                  </p>
+                </a>
               ))
             : Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="size-24 shrink-0 rounded-full" />
+                <Skeleton key={i} className="size-28 shrink-0 rounded-full" />
               ))}
         </div>
       )}
@@ -107,13 +150,20 @@ function RecentlyPlayed() {
         ) : (
           <ul>
             {recent.data.items.map(({ played_at, track }) => (
-              <li key={played_at} className="flex items-center gap-3 rounded-xl p-2 hover:bg-white/5">
-                <Artwork src={track.image} name={track.name ?? '?'} className="size-11" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{track.name}</p>
-                  <p className="truncate text-xs text-muted">{track.artists.join(', ')}</p>
-                </div>
-                <span className="text-xs text-faint tabular">{ago(played_at)}</span>
+              <li key={played_at}>
+                <a
+                  href={track.url ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-xl p-2 hover:bg-white/5"
+                >
+                  <Artwork src={track.image} name={track.name ?? '?'} className="size-11" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{track.name}</p>
+                    <p className="truncate text-xs text-muted">{track.artists.join(', ')}</p>
+                  </div>
+                  <span className="text-xs text-faint tabular">{ago(played_at)}</span>
+                </a>
               </li>
             ))}
           </ul>

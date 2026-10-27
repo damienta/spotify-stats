@@ -39,6 +39,9 @@ export interface TopRow {
   artist_name: string | null
   streams: number
   hours: number
+  // From Spotify's catalogue; missing until the stats job has looked the row up.
+  image?: string | null
+  url?: string | null
 }
 
 export interface Period {
@@ -72,6 +75,7 @@ export interface Discovery {
   artist_name: string
   first_played: string
   streams: number
+  minutes: number
 }
 
 export interface Repeat {

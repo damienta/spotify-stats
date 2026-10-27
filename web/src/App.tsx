@@ -1,8 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 
 import { Nav, type Tab } from './components/Nav'
-import { finishLogin, getToken } from './lib/api'
+import { Button } from './components/ui/button'
+import { finishLogin, getToken, logout } from './lib/api'
 import { Home } from './screens/Home'
 import { Login } from './screens/Login'
 import { Stats } from './screens/Stats'
@@ -41,6 +43,17 @@ export function App() {
       {/* A soft green glow behind the top of every page. */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(60%_80%_at_30%_0%,rgba(29,185,84,0.22),transparent_70%)]" />
       <Nav tab={tab} onChange={go} />
+      {/* Logout stays in the top corner on every tab. */}
+      <Button
+        variant="glass"
+        size="icon"
+        onClick={logout}
+        aria-label="Log out"
+        title="Log out"
+        className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:top-6 md:right-6"
+      >
+        <LogOut className="size-4" />
+      </Button>
       <main className="relative mx-auto max-w-3xl px-4 pt-6 pb-32 md:pl-64 md:pb-12 lg:max-w-5xl">
         <AnimatePresence mode="wait">
           <motion.div
