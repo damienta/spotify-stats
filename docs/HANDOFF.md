@@ -1,0 +1,94 @@
+# Handoff
+
+Where the project stands on 27 October 2026, how to run it, and what's next. For how it works,
+read [architecture/README.md](architecture/README.md); for why, read
+[architecture/decisions.md](architecture/decisions.md).
+
+## What it is
+
+A stats.fm-style Spotify stats app, built in stages to cover cloud and data platform skills
+(AWS, Terraform, Python, DuckDB; later Airflow, dbt, Iceberg, Kafka, Flink, Spark, Kubernetes).
+Stage 1, the working app, is live for one user (you, Spotify display name "neimad").
+
+## Live right now
+
+| Piece | State |
+|---|---|
+| Your history | 430,966 plays in S3 (`listens/user=bt9tbr9slbgo886lyqicrn4of/…`) |
+| Poller Lambda | Every 20 min, storing new plays |
+| Stats Lambda | Hourly; 143 documents for you; top lists ranked by minutes, with pictures and links |
+| API Lambda | `https://5o2g53vz3bhz4cgroqkvquvosm0dorcs.lambda-url.eu-north-1.on.aws/` |
+| Web app | Local: Home, Top, Stats; real data after login, or `/?demo` |
+| Tests | 113 Python tests; web lint, type-check and build in CI |
+
+## Everything built, by PR
+
+| PRs | What |
+|---|---|
+| #1 | Repo scaffold: uv workspace, ruff, pytest, pre-commit, CI, Terraform bootstrap (state bucket, budget) |
+| #2 | `Listen` schema, export parser, first local DuckDB stats |
+| #3 | ADR 0003: S3 is the source of truth, no listens table |
+| #5–#11 | Stats engine: Parquet + dedupe, time windows, top lists, habits, behaviour, 107 documents + Wrapped, docs |
+| #12 | Spotify client: OAuth, refresh, recently played; `spotify-login`, `fetch-recent` |
+| #13–#14 | Terraform: S3 data bucket; DynamoDB users and stats tables |
+| #17 | S3 layout, users table, history upload |
+| #18 | Poller Lambda |
+| #19 | Stats Lambda |
+| #20 | API Lambda: Spotify login, stats endpoints |
+| #21 | `scripts/deploy.py`, backend docs |
+| #22 | Today / this week / this month / this year windows (143 documents) |
+| #23 | `/me/now-playing`; race-safe token saving |
+| #24 | `/me/recent`; stores unseen plays; forward-only cursor |
+| #25–#26 | The web app; clearer "needs the latest backend" message |
+| #27 | Pictures and links from Spotify's catalogue (cached in S3); rank by minutes |
+| #28 | Web: real pictures, minutes first, fuller Today, logout on every tab, no Genres |
+| #4, #15 | Leftover test PRs, still open; safe to close |
+
+## How to run things
+
+```bash
+# Web app (http://localhost:5173; add ?demo for made-up data)
+cd web && npm install && npm run dev
+
+# Python tests and lint
+uv run pytest
+uv run ruff check .
+
+# Deploy backend changes (needs Terraform on PATH and the AWS profile)
+AWS_PROFILE=spotify-stats uv run python scripts/deploy.py
+
+# Rebuild everyone's stats now instead of waiting for the hour
+AWS_PROFILE=spotify-stats aws lambda invoke --function-name spotify-stats-stats \
+  --cli-binary-format raw-in-base64-out --payload '{"force": true}' out.json
+```
+
+Remember: **merged is not live**. Backend PRs need a deploy (`terraform apply`) before the app
+sees them.
+
+## Gotchas learned the hard way
+
+- The app's built-in terminal panel can't run `uv`; use a normal terminal.
+- In Git Bash, prefix AWS commands that take `/aws/...` or `/spotify-stats/...` paths with
+  `MSYS_NO_PATHCONV=1`.
+- Python scripts that edit files on Windows must pass `encoding="utf-8"`, or characters like
+  "–" get garbled.
+- Spotify's redirect URI must match exactly, with no trailing slash, and be **saved**.
+- Spotify (development mode): bulk catalogue lookups return 403, genres come back empty, and
+  only allow-listed users (up to 25) can log in.
+- Stopping a Vite dev server before switching git branches avoids stale "file not found" errors.
+
+## Next steps
+
+1. **Phone app** (Expo Go, Classic Spotify + glass): login, Home, Top, Stats, reusing the API
+   and the web app's types. Libraries: expo-glass-effect / expo-blur, Expo Router native tabs,
+   Skia and victory-native charts, Reanimated + Moti, expo-haptics, expo-image.
+2. **Small backend follow-ups:** `fetched_at` on now playing (exact progress through the
+   cache); pictures for on repeat and discoveries; time zone per user.
+3. **Friends (up to 25):** allow-list them in the Spotify dashboard; export upload for others
+   (upload link + importer Lambda); "delete my data"; hosting (a separate Cloudflare Pages
+   project or S3 + CloudFront) with CORS and the address allowed for login.
+4. **Stage 2, data platform:** Airflow + dbt models over the S3 data, genres from Last.fm or
+   MusicBrainz, data-quality tests. Then Iceberg, Kafka/Flink for live counts, Spark, and
+   Kubernetes (see [roadmap.md](roadmap.md)).
+5. **Tidy-up:** close PRs #4 and #15; delete stat documents whose names no longer exist; ask
+   AWS Support to allow OIDC so GitHub can deploy.

@@ -4,7 +4,8 @@ A stats.fm-style listening tracker for Spotify, growing into a small data platfo
 ingestion path on AWS, then a lakehouse (Iceberg), orchestration (Airflow + dbt) and streaming
 (Kafka + Flink). Later it becomes a "battle your friends" app with Apple Music support.
 
-See [docs/roadmap.md](docs/roadmap.md) for the stages.
+See [docs/roadmap.md](docs/roadmap.md) for the stages, [docs/architecture](docs/architecture) for how it
+works and why, and [docs/HANDOFF.md](docs/HANDOFF.md) for where it stands.
 
 ## Layout
 
@@ -16,7 +17,7 @@ See [docs/roadmap.md](docs/roadmap.md) for the stages.
 | `api/` | Python: FastAPI app served from Lambda |
 | `jobs/` | Python: batch jobs (DuckDB stats, later Spark) |
 | `ios/` | SwiftUI app |
-| `docs/` | Roadmap and architecture decision records |
+| `docs/` | Roadmap, architecture and decisions, ADRs, handoff |
 | `data/` | Local-only scratch data. Ignored by git: never commit Spotify exports |
 
 ## Getting started
