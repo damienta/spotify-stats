@@ -76,6 +76,8 @@ export interface Discovery {
   first_played: string
   streams: number
   minutes: number
+  image?: string | null
+  url?: string | null
 }
 
 export interface Repeat {
@@ -83,4 +85,6 @@ export interface Repeat {
   artist_name: string
   day: string
   streams: number
+  image?: string | null
+  url?: string | null
 }

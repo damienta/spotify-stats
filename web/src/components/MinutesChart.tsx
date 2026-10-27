@@ -9,7 +9,13 @@ export interface ChartPoint {
 }
 
 /** Minutes listened per hour, day or month, as green bars. */
-export function MinutesChart({ points, height = 140 }: { points: ChartPoint[]; height?: number }) {
+export function MinutesChart({
+  points,
+  height = 140,
+}: {
+  points: ChartPoint[]
+  height?: number | `${number}%`
+}) {
   // Only label every nth bar so 24 hours or 31 days don't overlap.
   const every = Math.ceil(points.length / 8)
   return (

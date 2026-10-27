@@ -1,6 +1,7 @@
 import { Flame, Trophy } from 'lucide-react'
 import { useState } from 'react'
 
+import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
 import { ListeningClock } from '@/components/ListeningClock'
 import { MinutesChart } from '@/components/MinutesChart'
@@ -8,6 +9,7 @@ import { Section } from '@/components/Section'
 import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
+import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
 import { count, duration, minutes, percent } from '@/lib/format'
 import { fillPeriod, GRAIN_STAT, type PeriodName } from '@/lib/periods'
@@ -142,27 +144,35 @@ function StreakCards() {
   )
 }
 
+function Favourite({ label, row, round }: { label: string; row?: TopRow; round?: boolean }) {
+  return (
+    <SpotlightCard className="p-0 transition-colors hover:bg-white/10">
+      <MaybeLink href={row?.url} className="flex items-center gap-3 p-4">
+        {row && (
+          <Artwork src={row.image} name={row.name} round={round} className="size-14 shrink-0" />
+        )}
+        <div className="min-w-0">
+          <p className="text-xs text-muted">{label}</p>
+          <p className="truncate text-lg font-bold">{row?.name ?? '–'}</p>
+          {row && (
+            <p className="truncate text-xs text-faint">
+              <Minutes value={row.hours * 60} hours={false} />
+              {row.artist_name && ` · ${row.artist_name}`}
+            </p>
+          )}
+        </div>
+      </MaybeLink>
+    </SpotlightCard>
+  )
+}
+
 function Favourites({ period }: { period: PeriodName }) {
   const artists = useStat<TopRow[]>('top_artists', period)
   const tracks = useStat<TopRow[]>('top_tracks', period)
-  const artist = artists.data?.[0]
-  const track = tracks.data?.[0]
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <SpotlightCard>
-        <p className="text-xs text-muted">Top artist</p>
-        <p className="truncate text-lg font-bold">{artist?.name ?? '–'}</p>
-        {artist && (
-          <p className="text-xs text-faint">
-            <Minutes value={artist.hours * 60} hours={false} />
-          </p>
-        )}
-      </SpotlightCard>
-      <SpotlightCard>
-        <p className="text-xs text-muted">Top track</p>
-        <p className="truncate text-lg font-bold">{track?.name ?? '–'}</p>
-        {track && <p className="truncate text-xs text-faint">{track.artist_name}</p>}
-      </SpotlightCard>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Favourite label="Top artist" row={artists.data?.[0]} round />
+      <Favourite label="Top track" row={tracks.data?.[0]} />
     </div>
   )
 }
@@ -177,14 +187,20 @@ function Lists({ period }: { period: PeriodName }) {
           {repeat.data?.length ? (
             <ul>
               {repeat.data.slice(0, 5).map((r) => (
-                <li key={`${r.track_name}-${r.day}`} className="flex items-center gap-3 p-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{r.track_name}</p>
-                    <p className="truncate text-xs text-muted">
-                      {r.artist_name} · {r.day}
-                    </p>
-                  </div>
-                  <span className="text-sm font-bold text-accent tabular">{r.streams}×</span>
+                <li key={`${r.track_name}-${r.day}`}>
+                  <MaybeLink
+                    href={r.url}
+                    className="flex items-center gap-3 rounded-xl p-2 hover:bg-white/5"
+                  >
+                    <Artwork src={r.image} name={r.track_name} className="size-11 text-xs" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{r.track_name}</p>
+                      <p className="truncate text-xs text-muted">
+                        {r.artist_name} · {r.day}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-accent tabular">{r.streams}×</span>
+                  </MaybeLink>
                 </li>
               ))}
             </ul>
@@ -200,14 +216,20 @@ function Lists({ period }: { period: PeriodName }) {
           {discoveries.data?.length ? (
             <ul>
               {discoveries.data.slice(0, 5).map((d) => (
-                <li key={d.artist_name} className="flex items-center gap-3 p-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{d.artist_name}</p>
-                    <p className="text-xs text-muted">First heard {d.first_played}</p>
-                  </div>
-                  <span className="text-xs text-faint">
-                    <Minutes value={d.minutes} hours={false} />
-                  </span>
+                <li key={d.artist_name}>
+                  <MaybeLink
+                    href={d.url}
+                    className="flex items-center gap-3 rounded-xl p-2 hover:bg-white/5"
+                  >
+                    <Artwork src={d.image} name={d.artist_name} round className="size-11 text-xs" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{d.artist_name}</p>
+                      <p className="text-xs text-muted">First heard {d.first_played}</p>
+                    </div>
+                    <span className="text-xs text-faint">
+                      <Minutes value={d.minutes} hours={false} />
+                    </span>
+                  </MaybeLink>
                 </li>
               ))}
             </ul>
