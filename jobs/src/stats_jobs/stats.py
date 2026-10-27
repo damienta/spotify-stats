@@ -60,6 +60,8 @@ class TopRow:
     artist_name: str | None
     streams: int
     hours: float
+    # The row's most-played Spotify track: how stats_jobs.catalog finds its picture and link.
+    track_id: str | None = None
 
 
 # The Listen schema (stats_ingest.listen) as DuckDB types, so JSON Lines files written by
@@ -167,7 +169,8 @@ def totals(con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME) -> Totals:
 def top(
     con: duckdb.DuckDBPyConnection, kind: Kind, limit: int = 10, window: Window = ALL_TIME
 ) -> list[TopRow]:
-    """Most-streamed artists, tracks or albums in a window. Ties go to more hours played."""
+    """Most-listened artists, tracks or albums in a window, ranked by time played: lots of
+    skipped plays shouldn't outrank fewer full listens. Ties go to more streams."""
     name, artist = TOP_COLUMNS[kind]
     rows = con.execute(
         f"""
@@ -175,12 +178,14 @@ def top(
             {name} AS name,
             {artist} AS artist,
             count(*) FILTER (WHERE ms_played >= $threshold) AS streams,
-            sum(ms_played) / 3600000.0 AS hours
+            sum(ms_played) / 3600000.0 AS hours,
+            first(track_id ORDER BY ms_played DESC, track_id) FILTER (WHERE track_id IS NOT NULL)
+                AS track_id
         FROM listens
         WHERE {IN_WINDOW}
         GROUP BY ALL
         -- Sort on whole milliseconds: summed floats can differ in the last digit between runs.
-        ORDER BY streams DESC, sum(ms_played) DESC, name, artist
+        ORDER BY sum(ms_played) DESC, streams DESC, name, artist
         LIMIT $limit
         """,
         window_params(window, threshold=STREAM_THRESHOLD_MS, limit=limit),

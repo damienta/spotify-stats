@@ -1,7 +1,8 @@
 """The hourly stats job: rebuild each user's stat documents from their listens in S3.
 
 For each user it downloads every listens file, builds the documents (stats_jobs.documents),
-writes them to the DynamoDB stats table, then compacts the poller's small JSON Lines files
+adds pictures and links to the top lists (stats_jobs.catalog), writes them to the DynamoDB
+stats table, then compacts the poller's small JSON Lines files
 into one Parquet file. Users whose listens haven't changed are skipped, except that everyone is
 rebuilt once a day because rolling windows ("4 weeks") move even without new plays.
 """
@@ -17,9 +18,11 @@ from pathlib import Path
 from typing import Any
 
 import boto3
+import httpx
 from botocore.config import Config
 
-from stats_ingest.storage import UsersTable, env, listens_prefix
+from stats_ingest.storage import UsersTable, env, listens_prefix, spotify_config_from_ssm
+from stats_jobs.catalog import Catalog, enrich, spotify_fetch
 from stats_jobs.documents import build_documents
 from stats_jobs.stats import connect
 from stats_jobs.windows import LOCAL_TZ
@@ -37,6 +40,7 @@ class JobResult:
     documents: int
     compacted: int
     skipped: bool = False
+    pictured: int = 0
 
 
 def list_listens(s3: Any, bucket: str, user_id: str) -> list[dict[str, Any]]:
@@ -68,6 +72,7 @@ def run_user(
     workdir: Path,
     now: datetime,
     force: bool = False,
+    catalog: Catalog | None = None,
 ) -> JobResult:
     objects = list_listens(s3, bucket, user_id)
     if not objects:
@@ -90,6 +95,7 @@ def run_user(
     con = connect(paths, materialize=True)
 
     documents = build_documents(con, user_id, now)
+    pictured = enrich(documents, catalog) if catalog else 0
     with stats_table.batch_writer() as batch:
         for doc in documents.values():
             batch.put_item(
@@ -127,7 +133,7 @@ def run_user(
             "generated_at": now.isoformat(),
         }
     )
-    return JobResult(user_id, len(documents), len(poll_files))
+    return JobResult(user_id, len(documents), len(poll_files), pictured=pictured)
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -144,6 +150,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     user_ids = event.get("user_ids") or [
         u.user_id for u in UsersTable(dynamodb.Table(env("USERS_TABLE"))).all()
     ]
+    bucket = env("DATA_BUCKET")
+    http = httpx.Client(timeout=10)
+    try:
+        catalog = Catalog.load(s3, bucket, spotify_fetch(http, spotify_config_from_ssm(ssm())))
+    except Exception:
+        # Stats without pictures beat no stats.
+        log.exception("the Spotify catalogue is unavailable; building stats without pictures")
+        catalog = None
 
     results = []
     for user_id in user_ids:
@@ -152,14 +166,23 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 result = run_user(
                     user_id,
                     s3=s3,
-                    bucket=env("DATA_BUCKET"),
+                    bucket=bucket,
                     stats_table=stats_table,
                     workdir=Path(workdir),
                     now=datetime.now(UTC),
                     force=bool(event.get("force")),
+                    catalog=catalog,
                 )
             results.append(result)
             log.info(json.dumps(asdict(result)))
         except Exception:
             log.exception("stats for %s failed", user_id)
+    if catalog:
+        catalog.save(s3, bucket)
+        log.info(json.dumps({"catalog_lookups": catalog.lookups}))
+    http.close()
     return {"users": len(results), "built": sum(not r.skipped for r in results)}
+
+
+def ssm() -> Any:
+    return boto3.client("ssm")

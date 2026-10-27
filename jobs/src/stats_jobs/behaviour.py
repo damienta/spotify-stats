@@ -36,6 +36,7 @@ class Discovery:
     artist_name: str
     first_played: date
     streams: int
+    minutes: float
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,7 @@ def most_skipped(
 def discoveries(
     con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME, limit: int = 10
 ) -> list[Discovery]:
-    """Artists first streamed inside the window, ranked by how much they've been streamed since.
+    """Artists first streamed inside the window, ranked by how long they've been played since.
 
     Over all time this is simply when each top artist was first heard.
     """
@@ -93,15 +94,15 @@ def discoveries(
         f"""
         WITH artists AS (
             SELECT artist_name, min(played_at) AS first_at, min(played_at_local)::DATE AS first_day,
-                   count(*) AS streams
+                   count(*) AS streams, sum(ms_played) AS ms
             FROM listens
             WHERE ms_played >= $threshold
             GROUP BY artist_name
         )
-        SELECT artist_name, first_day, streams
+        SELECT artist_name, first_day, streams, ms / 60000.0
         FROM artists
         WHERE {in_window("first_at")}
-        ORDER BY streams DESC, artist_name
+        ORDER BY ms DESC, streams DESC, artist_name
         LIMIT $limit
         """,
         window_params(window, threshold=STREAM_THRESHOLD_MS, limit=limit),

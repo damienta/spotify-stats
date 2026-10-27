@@ -96,6 +96,15 @@ def exchange_code(
     return Tokens(body["access_token"], body["refresh_token"], body["expires_at"])
 
 
+def app_token(http: httpx.Client, config: SpotifyConfig, now: float | None = None) -> Tokens:
+    """A token for the app itself (client credentials): reads Spotify's public catalogue, such
+    as track and artist pictures, without any user's login."""
+    body = _token_request(
+        http, config, {"grant_type": "client_credentials"}, time.time() if now is None else now
+    )
+    return Tokens(body["access_token"], "", body["expires_at"])
+
+
 def refresh_tokens(
     http: httpx.Client, config: SpotifyConfig, tokens: Tokens, now: float | None = None
 ) -> Tokens:
