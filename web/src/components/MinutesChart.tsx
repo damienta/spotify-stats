@@ -18,8 +18,14 @@ export function MinutesChart({
 }) {
   // Only label every nth bar so 24 hours or 31 days don't overlap.
   const every = Math.ceil(points.length / 8)
+  const busiest = points.reduce((a, b) => (b.minutes > a.minutes ? b : a), points[0])
+  const total = points.reduce((sum, p) => sum + p.minutes, 0)
+  // Screen readers get a sentence instead of the bars.
+  const summary = busiest?.minutes
+    ? `Bar chart: ${duration(total)} in total, busiest ${busiest.label} with ${duration(busiest.minutes)}.`
+    : 'Bar chart: no listening yet.'
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={height} role="img" aria-label={summary}>
       <BarChart data={points} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
         <XAxis
           dataKey="label"

@@ -1,4 +1,4 @@
-import { Flame, Trophy } from 'lucide-react'
+import { Flame, RefreshCw, Trophy } from 'lucide-react'
 import { useState } from 'react'
 
 import { Artwork } from '@/components/Artwork'
@@ -8,12 +8,13 @@ import { MinutesChart } from '@/components/MinutesChart'
 import { Section } from '@/components/Section'
 import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
+import { Button } from '@/components/ui/button'
 import { Problem, Skeleton } from '@/components/States'
 import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
-import { count, duration, minutes, percent } from '@/lib/format'
+import { ago, count, duration, minutes, percent } from '@/lib/format'
 import { fillPeriod, GRAIN_STAT, type PeriodName } from '@/lib/periods'
-import { useStat } from '@/lib/queries'
+import { useRefreshStats, useStat, useStatBuiltAt } from '@/lib/queries'
 import type {
   ClockCell,
   Discovery,
@@ -244,11 +245,35 @@ function Lists({ period }: { period: PeriodName }) {
   )
 }
 
+/** "Updated 12m ago", and a button to fetch the latest build now. */
+function Freshness({ period }: { period: PeriodName }) {
+  const builtAt = useStatBuiltAt('totals', period)
+  const refresh = useRefreshStats()
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted">
+      {builtAt.data && <span>Updated {ago(builtAt.data)} ago</span>}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={refresh}
+        aria-label="Refresh stats"
+        title="Refresh stats"
+        className="size-7"
+      >
+        <RefreshCw className={builtAt.isFetching ? 'size-3.5 animate-spin' : 'size-3.5'} />
+      </Button>
+    </div>
+  )
+}
+
 export function Stats() {
   const [period, setPeriod] = useState<PeriodName>('this_week')
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold tracking-tight">Your stats</h1>
+      <div className="flex flex-wrap items-end justify-between gap-2 pr-12">
+        <h1 className="text-3xl font-extrabold tracking-tight">Your stats</h1>
+        <Freshness period={period} />
+      </div>
       <Segmented options={PERIODS} value={period} onChange={setPeriod} />
       <BigNumber period={period} />
       <Tiles period={period} />
