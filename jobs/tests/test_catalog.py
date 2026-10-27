@@ -149,3 +149,24 @@ def test_discoveries_get_the_artists_picture():
     enrich(documents, Catalog(FakeSpotify()))
 
     assert documents["discoveries#4_weeks"]["data"][0]["url"].endswith("/artist/a1")
+
+
+def test_a_long_rate_limit_is_remembered_until_it_ends(aws):
+    s3 = boto3.client("s3")
+    now = [1_000.0]
+
+    def limited(path):
+        raise RateLimited("wait", 86_400)
+
+    catalog = Catalog(limited, clock=lambda: now[0])
+    catalog.describe("track", "t1", None)
+    catalog.save(s3, "data")
+
+    spotify = FakeSpotify()
+    later = Catalog.load(s3, "data", spotify)
+    later.clock = lambda: now[0] + 3_600  # an hour on: still paused, Spotify isn't asked
+    assert later.describe("track", "t1", None) == {}
+    assert spotify.calls == []
+
+    later.clock = lambda: now[0] + 86_401  # the next day: asking again
+    assert later.describe("track", "t1", None)["url"].endswith("/track/t1")
