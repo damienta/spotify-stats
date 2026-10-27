@@ -37,6 +37,8 @@ class Discovery:
     first_played: date
     streams: int
     minutes: float
+    # The artist's most-played track, for stats_jobs.catalog to find their picture.
+    track_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ class Repeat:
     artist_name: str
     day: date
     streams: int
+    track_id: str | None = None
 
 
 def skip_rate(con: duckdb.DuckDBPyConnection, window: Window = ALL_TIME) -> float | None:
@@ -94,12 +97,14 @@ def discoveries(
         f"""
         WITH artists AS (
             SELECT artist_name, min(played_at) AS first_at, min(played_at_local)::DATE AS first_day,
-                   count(*) AS streams, sum(ms_played) AS ms
+                   count(*) AS streams, sum(ms_played) AS ms,
+                   first(track_id ORDER BY ms_played DESC, track_id)
+                       FILTER (WHERE track_id IS NOT NULL) AS track_id
             FROM listens
             WHERE ms_played >= $threshold
             GROUP BY artist_name
         )
-        SELECT artist_name, first_day, streams, ms / 60000.0
+        SELECT artist_name, first_day, streams, ms / 60000.0, track_id
         FROM artists
         WHERE {in_window("first_at")}
         ORDER BY ms DESC, streams DESC, artist_name
@@ -138,7 +143,8 @@ def on_repeat(
     """The most times a single track was streamed in one day."""
     rows = con.execute(
         f"""
-        SELECT track_name, artist_name, played_at_local::DATE AS day, count(*) AS streams
+        SELECT track_name, artist_name, played_at_local::DATE AS day, count(*) AS streams,
+               first(track_id ORDER BY track_id) FILTER (WHERE track_id IS NOT NULL)
         FROM listens
         WHERE {IN_WINDOW} AND ms_played >= $threshold
         GROUP BY ALL
