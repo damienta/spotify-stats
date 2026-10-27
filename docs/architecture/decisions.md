@@ -86,6 +86,9 @@ few.
 | **One shared cache file in S3** (`catalog/spotify.json`) | Free, one read and one write per run, shared by all users | Fine while one job writes it at a time |
 | **One-at-a-time lookups, 300 per run** | Spotify returns 403 for bulk lookups to development-mode apps | A first run takes a few hours to picture everything |
 | **No genres** | Spotify returns no genres to this app any more | A Genres tab needs another source (Last.fm or MusicBrainz) |
+| **Look up #1 of every list first, then every #2, past years last** | The first run spent its budget alphabetically and missed the 4-week #1 | Deep ranks fill in over later runs |
+| **Remember Spotify's back-off in the cache file** (`paused_until`) | After ~800 lookups Spotify asked to wait ~23.5 hours; asking hourly anyway risks a longer wait | Pictures for new items pause for that time |
+| **Pictures for on repeat and new to you too** | Every row in the app should be clickable | More lookups |
 
 ## API and login
 
@@ -111,6 +114,12 @@ few.
 | **TanStack Query for data** | Caching across tabs, polling for now playing, sensible retries |
 | **Minutes first, hours in brackets** | Easier to compare; your preference |
 | **Demo mode (`?demo`)** | Test and screenshot without logging in or showing real data |
+| **Top 100 stored, 10 shown, "Show top 100" to expand** | Most people look at the top 10; all 100 arrive in one ~25 KB request, so expanding is instant |
+| **Everything links straight to Spotify; no search fallback** | A search page is a worse experience than no link |
+| **Screens load on demand (code splitting); images load lazily** | The first download fell from 839 KB to about 250 KB |
+| **Home-screen manifest and icons** | "Add to Home Screen" opens it full-screen like an app, no App Store |
+| **Accessibility: focus rings, skip link, chart summaries, reduce motion** | Usable by keyboard and screen reader; a step towards the Settings plan |
+| **An error boundary per screen** | One crash can't blank the whole app |
 
 ## Things deliberately left for later
 

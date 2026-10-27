@@ -1,8 +1,9 @@
 # Handoff
 
-Where the project stands on 27 October 2026, how to run it, and what's next. For how it works,
+Where the project stands on the evening of 27 October 2026, how to run it, and what's next. For how it works,
 read [architecture/README.md](architecture/README.md); for why, read
-[architecture/decisions.md](architecture/decisions.md).
+[architecture/decisions.md](architecture/decisions.md); for pictures and caching, read
+[architecture/caching.md](architecture/caching.md).
 
 ## What it is
 
@@ -16,10 +17,11 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 |---|---|
 | Your history | 430,966 plays in S3 (`listens/user=bt9tbr9slbgo886lyqicrn4of/…`) |
 | Poller Lambda | Every 20 min, storing new plays |
-| Stats Lambda | Hourly; 143 documents for you; top lists ranked by minutes, with pictures and links |
+| Stats Lambda | Hourly; 143 documents for you; top 100s ranked by minutes, with pictures and links |
+| Catalogue cache | `catalog/spotify.json`: 422 tracks, 164 artists; Spotify paused lookups until 28 Oct 18:14 |
 | API Lambda | `https://5o2g53vz3bhz4cgroqkvquvosm0dorcs.lambda-url.eu-north-1.on.aws/` |
 | Web app | Local: Home, Top, Stats; real data after login, or `/?demo` |
-| Tests | 113 Python tests; web lint, type-check and build in CI |
+| Tests | 116 Python tests; web lint, type-check and build in CI |
 
 ## Everything built, by PR
 
@@ -42,6 +44,11 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #25–#26 | The web app; clearer "needs the latest backend" message |
 | #27 | Pictures and links from Spotify's catalogue (cached in S3); rank by minutes |
 | #28 | Web: real pictures, minutes first, fuller Today, logout on every tab, no Genres |
+| #29 | Architecture docs, decisions, this handoff |
+| #30 | Top 100; lookups #1s first; pictures for on repeat and new to you |
+| #31 | Web: direct Spotify links everywhere, top 10 that expands, "minutes", aligned Today |
+| #32 | Remember Spotify's back-off in the cache file |
+| #33 | Web: code splitting, lazy images, home-screen manifest, accessibility, error boundaries, "updated X ago" |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things
@@ -79,16 +86,37 @@ sees them.
 
 ## Next steps
 
-1. **Phone app** (Expo Go, Classic Spotify + glass): login, Home, Top, Stats, reusing the API
-   and the web app's types. Libraries: expo-glass-effect / expo-blur, Expo Router native tabs,
-   Skia and victory-native charts, Reanimated + Moti, expo-haptics, expo-image.
-2. **Small backend follow-ups:** `fetched_at` on now playing (exact progress through the
-   cache); pictures for on repeat and discoveries; time zone per user.
-3. **Friends (up to 25):** allow-list them in the Spotify dashboard; export upload for others
-   (upload link + importer Lambda); "delete my data"; hosting (a separate Cloudflare Pages
-   project or S3 + CloudFront) with CORS and the address allowed for login.
-4. **Stage 2, data platform:** Airflow + dbt models over the S3 data, genres from Last.fm or
-   MusicBrainz, data-quality tests. Then Iceberg, Kafka/Flink for live counts, Spark, and
-   Kubernetes (see [roadmap.md](roadmap.md)).
-5. **Tidy-up:** close PRs #4 and #15; delete stat documents whose names no longer exist; ask
-   AWS Support to allow OIDC so GitHub can deploy.
+**Soon (small)**
+1. Rename the Top tab (suggested "Charts").
+2. Now playing returns `fetched_at`, so the progress bar is exact through the 5-second cache.
+3. Delete stat documents whose names no longer exist; close leftover PRs #4 and #15.
+
+**Settings page** (your plan)
+- Text size (normal, large, extra large), high-contrast mode, colour themes (Spotify green,
+  plus a few accents), reduce motion on or off, time as minutes or hours.
+- Stored in the browser first; later in the users table so it follows you to the phone app.
+- Built on Tailwind theme variables, so a theme is a different set of colour tokens.
+
+**Pictures**
+- A catalogue queue: one lookup every few seconds instead of bursts, new users' top 10s first.
+- On-demand lookups for a row that's missing a picture; refresh entries older than a few
+  months.
+
+**Phone app** (Expo Go, Classic Spotify + glass)
+- Login, Home, Charts, Stats; reuse the API and the web app's types. Libraries:
+  expo-glass-effect / expo-blur, Expo Router native tabs, Skia + victory-native charts,
+  Reanimated + Moti, expo-haptics, expo-image.
+
+**Friends (up to 25)**
+- Allow-list them in the Spotify dashboard; export upload for others (upload link + importer
+  Lambda); "delete my data" and a privacy page; time zone per user; host the web app (a separate
+  Cloudflare Pages project or S3 + CloudFront) with CORS and the address allowed for login.
+- Then battles: compare minutes, top artists and streaks with a friend.
+
+**Data platform (the CV stages)**
+- Stage 2: Airflow + dbt over the S3 data (star schema, tests), genres from Last.fm.
+- Stage 3: Iceberg tables on S3, Athena, a Spark backfill.
+- Stage 4: Kafka + Flink for live "today" counts.
+- Stage 5: Kubernetes (kind/k3d), Prometheus + Grafana.
+- Stage 6: BigQuery or Snowflake copies; Apple Music.
+- Ask AWS Support to allow GitHub OIDC so merges can deploy themselves.
