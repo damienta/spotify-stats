@@ -117,7 +117,7 @@ function data(stat: string, window: string): unknown {
     case 'skips':
       return { skip_rate: 0.18, most_skipped_artists: [] }
     case 'discoveries':
-      return ARTISTS.slice(5).map((artist_name, i) => ({ artist_name, first_played: '2026-10-0' + (i + 2), streams: 40 - i * 6 }))
+      return ARTISTS.slice(5).map((artist_name, i) => ({ artist_name, first_played: '2026-10-0' + (i + 2), streams: 40 - i * 6, minutes: 130 - i * 20 }))
     case 'on_repeat':
       return TRACKS.slice(0, 5).map((track_name, i) => ({ track_name, artist_name: ARTISTS[i], day: `2026-10-${pad(20 + i)}`, streams: 14 - i * 2 }))
   }

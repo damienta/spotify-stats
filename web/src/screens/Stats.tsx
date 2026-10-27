@@ -8,7 +8,8 @@ import { Section } from '@/components/Section'
 import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
-import { count, duration, percent } from '@/lib/format'
+import { Minutes } from '@/components/Minutes'
+import { count, duration, minutes, percent } from '@/lib/format'
 import { fillPeriod, GRAIN_STAT, type PeriodName } from '@/lib/periods'
 import { useStat } from '@/lib/queries'
 import type {
@@ -37,14 +38,21 @@ function BigNumber({ period }: { period: PeriodName }) {
     <div className="py-4 text-center">
       <p className="text-sm text-muted">Listening time {long}</p>
       {totals.data ? (
-        <p className="text-6xl font-extrabold tracking-tight text-accent sm:text-7xl tabular">
-          <BlurText
-            key={`${period}-${totals.data.hours}`}
-            text={duration(totals.data.hours * 60)}
-            delay={90}
-            className="justify-center"
-          />
-        </p>
+        <>
+          <p className="text-6xl font-extrabold tracking-tight text-accent sm:text-7xl tabular">
+            <BlurText
+              key={`${period}-${totals.data.hours}`}
+              text={minutes(totals.data.hours * 60)}
+              delay={90}
+              className="justify-center"
+            />
+          </p>
+          {totals.data.hours >= 1 && (
+            <p className="mt-1 text-lg font-semibold text-muted tabular">
+              ({duration(totals.data.hours * 60)})
+            </p>
+          )}
+        </>
       ) : (
         <Skeleton className="mx-auto mt-2 h-16 w-64" />
       )}
@@ -144,7 +152,11 @@ function Favourites({ period }: { period: PeriodName }) {
       <SpotlightCard>
         <p className="text-xs text-muted">Top artist</p>
         <p className="truncate text-lg font-bold">{artist?.name ?? '–'}</p>
-        {artist && <p className="text-xs text-faint">{duration(artist.hours * 60)}</p>}
+        {artist && (
+          <p className="text-xs text-faint">
+            <Minutes value={artist.hours * 60} hours={false} />
+          </p>
+        )}
       </SpotlightCard>
       <SpotlightCard>
         <p className="text-xs text-muted">Top track</p>
@@ -193,7 +205,9 @@ function Lists({ period }: { period: PeriodName }) {
                     <p className="truncate text-sm font-semibold">{d.artist_name}</p>
                     <p className="text-xs text-muted">First heard {d.first_played}</p>
                   </div>
-                  <span className="text-xs text-faint tabular">{count(d.streams)} streams</span>
+                  <span className="text-xs text-faint">
+                    <Minutes value={d.minutes} hours={false} />
+                  </span>
                 </li>
               ))}
             </ul>
