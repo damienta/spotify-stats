@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* Classic Spotify: near-black surfaces, Spotify green, grey secondary text. */
+@theme {
+  --color-bg: #121212;
+  --color-surface: #181818;
+  --color-surface-2: #282828;
+  --color-accent: #1db954;
+  --color-accent-bright: #1ed760;
+  --color-muted: #b3b3b3;
+  --color-faint: #6a6a6a;
+  --font-sans: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The glass style: translucent white over the dark background, blurred behind. */
+@utility glass {
+  background-color: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: white;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
