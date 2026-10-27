@@ -35,10 +35,11 @@ data "aws_iam_policy_document" "stats" {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.data.arn]
 
+    # catalog/ too, so a missing catalogue file reads as NoSuchKey rather than AccessDenied.
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = ["listens/*"]
+      values   = ["listens/*", "catalog/*"]
     }
   }
 
@@ -46,6 +47,20 @@ data "aws_iam_policy_document" "stats" {
     sid       = "ReadAndCompactListens"
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.data.arn}/listens/*"]
+  }
+
+  # The shared cache of Spotify pictures and links (stats_jobs.catalog).
+  statement {
+    sid       = "ReadAndWriteCatalog"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.data.arn}/catalog/*"]
+  }
+
+  # The Spotify app credentials, for catalogue lookups as the app.
+  statement {
+    sid       = "ReadSettings"
+    actions   = ["ssm:GetParameters", "ssm:GetParameter"]
+    resources = [local.ssm_arn]
   }
 }
 
