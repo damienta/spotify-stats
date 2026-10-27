@@ -44,11 +44,12 @@ def test_totals(con):
     assert t.last_played.startswith("2024-06-30")
 
 
-def test_top_artists_rank_by_streams_over_30_seconds(con):
+def test_top_artists_rank_by_time_and_count_streams_over_30_seconds(con):
     ranked = top(con, "artist", limit=3)
 
-    assert [(a.name, a.streams) for a in ranked] == [("A", 2), ("B", 1), ("C", 0)]
-    assert ranked[1].hours == pytest.approx(1.0)
+    # B's single hour-long play outranks A's two shorter streams.
+    assert [(a.name, a.streams) for a in ranked] == [("B", 1), ("A", 2), ("C", 0)]
+    assert ranked[0].hours == pytest.approx(1.0)
 
 
 def test_top_artists_respects_the_limit(con):

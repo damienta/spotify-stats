@@ -8,6 +8,7 @@ from stats_ingest.spotify import (
     SpotifyConfig,
     SpotifyError,
     Tokens,
+    app_token,
     authorize_url,
     exchange_code,
     refresh_tokens,
@@ -161,3 +162,13 @@ def test_errors_carry_the_status():
     with pytest.raises(SpotifyError) as e:
         SpotifyClient(fake_spotify(handler), CONFIG, FRESH, clock=lambda: 0).currently_playing()
     assert e.value.status == 403
+
+
+def test_app_token_uses_client_credentials():
+    def handler(request):
+        assert b"grant_type=client_credentials" in request.content
+        return httpx.Response(200, json={"access_token": "app", "expires_in": 3600})
+
+    tokens = app_token(fake_spotify(handler), CONFIG, now=0)
+
+    assert (tokens.access_token, tokens.expires_at) == ("app", 3600)

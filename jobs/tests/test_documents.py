@@ -56,7 +56,13 @@ def test_documents_are_json_with_their_key_and_owner(con):
 
     doc = docs["top_artists#all_time"]
     assert (doc["user_id"], doc["stat_name"]) == ("u1", "top_artists#all_time")
-    assert doc["data"][0] == {"name": "A", "artist_name": None, "streams": 20, "hours": 1.1111}
+    assert doc["data"][0] == {
+        "name": "A",
+        "artist_name": None,
+        "streams": 20,
+        "hours": 1.1111,
+        "track_id": "t0",
+    }
     assert docs["totals#4_weeks"]["data"]["streams"] == 1
     for d in docs.values():
         assert len(json.dumps(d).encode()) < MAX_DOCUMENT_BYTES
