@@ -12,6 +12,16 @@ export function Skeleton({ className }: { className?: string }) {
 /** What to show when a request failed: stats not built yet, reconnect, or try again. */
 export function Problem({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const status = error instanceof ApiError ? error.status : 0
+  const detail = error instanceof ApiError ? error.message : ''
+  // FastAPI's own "Not Found" (no such route) or an unknown window means the API is older
+  // than this app, not that the stats are missing.
+  if ((status === 404 && detail === 'Not Found') || detail === 'unknown window') {
+    return (
+      <p className="py-6 text-center text-sm text-muted">
+        This needs the latest backend. Deploy it and refresh.
+      </p>
+    )
+  }
   if (status === 404) {
     return (
       <p className="py-6 text-center text-sm text-muted">
