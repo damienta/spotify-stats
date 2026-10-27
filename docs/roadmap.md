@@ -23,13 +23,16 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 - [x] Export upload from the CLI (`upload-export`); an import Lambda for other users comes later
 - [x] Hourly stats Lambda with DuckDB (dedupes on listen_id, compacts poll files) → DynamoDB
 - [x] FastAPI + Mangum on a Lambda function URL, one-command deploy (`scripts/deploy.py`)
-- [ ] Mobile app (Expo / React Native, runs in Expo Go): login, overview, top lists, habits
+- [x] Today / this week / this month / this year; live now playing and recently played
+- [x] Pictures and links from Spotify's catalogue; lists ranked by minutes
+- [x] Web app (local): login, Home, Top, Stats; demo mode
+- [ ] Mobile app (Expo / React Native, runs in Expo Go): login, Home, Top, Stats
 
 ## Stage 2: Warehousing and orchestration
 
 - [ ] Airflow (local, docker-compose)
 - [ ] dbt star schema: `fct_listens`, `dim_track`, `dim_artist`, `dim_user`, SCD2 top artists
-- [ ] Genre enrichment from MusicBrainz / Last.fm
+- [ ] Genre enrichment from MusicBrainz / Last.fm (Spotify no longer returns genres)
 - [ ] Data-quality tests that fail the DAG
 
 ## Stage 3: Lakehouse
