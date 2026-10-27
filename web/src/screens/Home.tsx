@@ -1,4 +1,5 @@
 import { Artwork } from '@/components/Artwork'
+import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
 import { MinutesChart } from '@/components/MinutesChart'
 import { NowPlayingCard } from '@/components/NowPlayingCard'
@@ -35,25 +36,27 @@ function Metric({ label, value }: { label: string; value: string }) {
 /** Today's top artist or track, with its picture. */
 function TodayTop({ label, row, round }: { label: string; row?: TopRow; round?: boolean }) {
   return (
-    <SpotlightCard className="flex items-center gap-3">
-      {row ? (
-        <>
-          <Artwork src={row.image} name={row.name} round={round} className="size-14 shrink-0" />
-          <div className="min-w-0">
+    <SpotlightCard className="p-0 transition-colors hover:bg-white/10">
+      <MaybeLink href={row?.url} className="flex items-center gap-3 p-4">
+        {row ? (
+          <>
+            <Artwork src={row.image} name={row.name} round={round} className="size-14 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted">{label}</p>
+              <p className="truncate font-bold">{row.name}</p>
+              <p className="truncate text-xs text-muted">
+                <Minutes value={row.hours * 60} hours={false} />
+                {row.artist_name && ` · ${row.artist_name}`}
+              </p>
+            </div>
+          </>
+        ) : (
+          <div>
             <p className="text-xs text-muted">{label}</p>
-            <p className="truncate font-bold">{row.name}</p>
-            <p className="truncate text-xs text-muted">
-              <Minutes value={row.hours * 60} hours={false} />
-              {row.artist_name && ` · ${row.artist_name}`}
-            </p>
+            <p className="font-bold">–</p>
           </div>
-        </>
-      ) : (
-        <div>
-          <p className="text-xs text-muted">{label}</p>
-          <p className="font-bold">–</p>
-        </div>
-      )}
+        )}
+      </MaybeLink>
     </SpotlightCard>
   )
 }
@@ -65,21 +68,24 @@ function Today() {
   const tracks = useStat<TopRow[]>('top_tracks', 'today')
   const t = totals.data
   return (
-    <Section title="Today">
+    <Section title="Today" className="h-full">
       <div className="grid grid-cols-2 gap-3">
         <Metric label="Minutes" value={t ? count(t.hours * 60) : '–'} />
         <Metric label="Streams" value={t ? count(t.streams) : '–'} />
         <Metric label="Artists" value={t ? count(t.artists) : '–'} />
         <Metric label="Tracks" value={t ? count(t.tracks) : '–'} />
       </div>
-      <SpotlightCard>
+      {/* Grows so Today ends level with Recently played beside it. */}
+      <SpotlightCard className="flex min-h-40 flex-1 flex-col">
         <p className="mb-2 text-xs text-muted">Minutes by hour</p>
         {hours.isError ? (
           <Problem error={hours.error} onRetry={() => hours.refetch()} />
         ) : hours.data ? (
-          <MinutesChart points={fillPeriod('today', hours.data)} height={110} />
+          <div className="min-h-28 flex-1">
+            <MinutesChart points={fillPeriod('today', hours.data)} height="100%" />
+          </div>
         ) : (
-          <Skeleton className="h-28" />
+          <Skeleton className="h-28 flex-1" />
         )}
       </SpotlightCard>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -141,8 +147,8 @@ function TopArtists({ onSeeAll }: { onSeeAll: () => void }) {
 function RecentlyPlayed() {
   const recent = useRecent(10)
   return (
-    <Section title="Recently played">
-      <SpotlightCard className="p-2">
+    <Section title="Recently played" className="h-full">
+      <SpotlightCard className="flex-1 p-2">
         {recent.isError ? (
           <Problem error={recent.error} onRetry={() => recent.refetch()} />
         ) : !recent.data ? (

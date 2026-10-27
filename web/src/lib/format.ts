@@ -6,9 +6,9 @@ export function duration(minutes: number): string {
   return m === 0 ? `${h.toLocaleString()}h` : `${h.toLocaleString()}h ${m}m`
 }
 
-/** "1,766 min": time is always shown in minutes first. */
+/** "1,766 minutes": time is always shown in minutes first. */
 export function minutes(m: number): string {
-  return `${count(m)} min`
+  return `${count(m)} ${Math.round(m) === 1 ? 'minute' : 'minutes'}`
 }
 
 export function count(n: number): string {
