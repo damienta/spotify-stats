@@ -27,7 +27,7 @@ from stats_ingest.spotify import API_URL, SpotifyConfig, app_token
 log = logging.getLogger()
 
 CATALOG_KEY = "catalog/spotify.json"
-LOOKUP_BUDGET = 300
+LOOKUP_BUDGET = 500
 # Longer waits than this end the run's lookups rather than stall the stats job.
 MAX_RETRY_AFTER_S = 5
 IMAGE_SIZE = 300
@@ -150,9 +150,9 @@ class Catalog:
     def artist(self, artist_id: str) -> dict[str, Any] | None:
         return self._lookup(self.artists, "/artists", artist_id, _artist_entry)
 
-    def describe(self, kind: str, row: dict[str, Any]) -> dict[str, Any]:
-        """`image` and `url` for one top-list row of `kind` artist, track or album."""
-        track_id = row.get("track_id")
+    def describe(self, kind: str, track_id: str | None, name: str | None) -> dict[str, Any]:
+        """`image` and `url` for an artist, track or album, found through a track it plays on.
+        For artists, `name` picks the right one when the track has featured artists."""
         track = self.track(track_id) if track_id else None
         if not track:
             return {}
@@ -160,39 +160,56 @@ class Catalog:
             return {"image": track["image"], "url": track["url"]}
         if kind == "album":
             return {"image": track["image"], "url": track["album_url"]}
-        # The artist named in the row, not a featured one on their most-played track.
-        artists = track["artists"]
-        match = next((a for a in artists if a["name"] == row.get("name")), None)
+        match = next((a for a in track["artists"] if a["name"] == name), None)
         artist = self.artist(match["id"]) if match else None
         return {"image": artist["image"], "url": artist["url"]} if artist else {}
 
 
-TOP_KINDS = {"top_artists": "artist", "top_tracks": "track", "top_albums": "album"}
+# Lists that get pictures: stat name -> (kind, the field holding the name).
+LISTS = {
+    "top_artists": ("artist", "name"),
+    "top_tracks": ("track", "name"),
+    "top_albums": ("album", "name"),
+    "on_repeat": ("track", "track_name"),
+    "discoveries": ("artist", "artist_name"),
+}
+# The windows the app shows most get looked up first; past years and Wrapped last.
+WINDOW_ORDER = [
+    "4_weeks",
+    "today",
+    "this_week",
+    "this_month",
+    "6_months",
+    "12_months",
+    "this_year",
+    "all_time",
+]
 
 
-def _rolling_first(stat_name: str) -> tuple[bool, str]:
-    # Spend the lookup budget on what the app shows most: recent windows before past years.
-    return ("year_" in stat_name or "wrapped" in stat_name, stat_name)
+def _rows(documents: dict[str, dict[str, Any]]) -> list[tuple[tuple, str, str, dict[str, Any]]]:
+    """Every row that can have a picture, in the order to look them up: #1 of every recent
+    list, then every #2, and so on, then past years."""
+    found = []
+    for stat_name, doc in documents.items():
+        base, _, window = stat_name.partition("#")
+        lists = {base: doc["data"]} if base in LISTS else {}
+        if base == "wrapped":
+            lists = {name: doc["data"].get(name) or [] for name in LISTS}
+        past = window not in WINDOW_ORDER
+        order = WINDOW_ORDER.index(window) if not past else len(WINDOW_ORDER)
+        for name, rows in lists.items():
+            kind, name_field = LISTS[name]
+            for rank, row in enumerate(rows):
+                found.append(((past, rank, order, stat_name), kind, row.get(name_field), row))
+    return sorted(found, key=lambda f: f[0])
 
 
 def enrich(documents: dict[str, dict[str, Any]], catalog: Catalog) -> int:
-    """Add `image` and `url` to every top-list row that the catalogue can describe, in place.
-    Returns how many rows got a picture."""
+    """Add `image` and `url` to every list row the catalogue can describe, in place. Returns
+    how many rows got a picture."""
     pictured = 0
-
-    def add(kind: str, rows: list[dict[str, Any]]) -> None:
-        nonlocal pictured
-        for row in rows:
-            details = catalog.describe(kind, row)
-            row.update(details)
-            pictured += bool(details.get("image"))
-
-    for stat_name in sorted(documents, key=_rolling_first):
-        data = documents[stat_name]["data"]
-        base = stat_name.split("#")[0]
-        if base in TOP_KINDS:
-            add(TOP_KINDS[base], data)
-        elif base == "wrapped":
-            for name, kind in TOP_KINDS.items():
-                add(kind, data.get(name) or [])
+    for _, kind, name, row in _rows(documents):
+        details = catalog.describe(kind, row.get("track_id"), name)
+        row.update(details)
+        pictured += bool(details.get("image"))
     return pictured

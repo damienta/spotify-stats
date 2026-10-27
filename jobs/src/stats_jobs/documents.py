@@ -18,7 +18,7 @@ from stats_jobs.habits import Grain, listening_clock, minutes_by, streaks
 from stats_jobs.stats import top, totals
 from stats_jobs.windows import LOCAL_TZ, Window, standard_windows, year
 
-TOP_LIMIT = 50
+TOP_LIMIT = 100
 GRAINS: dict[str, Grain] = {
     "today": "hour",
     "this_week": "day",
