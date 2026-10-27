@@ -3,7 +3,9 @@
 Spotify only lets this app (in development mode) look tracks and artists up one at a time, and
 no longer returns genres. So each track and artist is looked up once, ever, and kept in one
 JSON file shared by every user: `catalog/spotify.json` in the data bucket. A run looks up at
-most `LOOKUP_BUDGET` new items; anything left over gets its picture on a later run.
+most `LOOKUP_BUDGET` new items; anything left over gets its picture on a later run. When
+Spotify says to back off (it has asked for nearly 24 hours after a busy day), the file
+remembers until when, and no run asks again before then.
 
 Pictures are Spotify's own image URLs (i.scdn.co), not copies: Spotify wants apps to show its
 artwork from its servers.
@@ -36,7 +38,9 @@ Fetch = Callable[[str], dict[str, Any] | None]
 
 
 class RateLimited(Exception):
-    pass
+    def __init__(self, message: str, wait_s: float = 0) -> None:
+        super().__init__(message)
+        self.wait_s = wait_s
 
 
 def spotify_fetch(http: httpx.Client, config: SpotifyConfig) -> Fetch:
@@ -54,14 +58,14 @@ def spotify_fetch(http: httpx.Client, config: SpotifyConfig) -> Fetch:
             if response.status_code == 429:
                 wait = float(response.headers.get("Retry-After", "1"))
                 if wait > MAX_RETRY_AFTER_S:
-                    raise RateLimited(f"Spotify asked to wait {wait:.0f} s")
+                    raise RateLimited(f"Spotify asked to wait {wait:.0f} s", wait)
                 time.sleep(wait)
                 continue
             if response.status_code in (400, 404):
                 return None
             response.raise_for_status()
             return response.json()
-        raise RateLimited("still rate limited")
+        raise RateLimited("still rate limited", MAX_RETRY_AFTER_S)
 
     return fetch
 
@@ -99,8 +103,14 @@ class Catalog:
         tracks: dict[str, Any] | None = None,
         artists: dict[str, Any] | None = None,
         budget: int = LOOKUP_BUDGET,
+        paused_until: float = 0,
+        clock: Callable[[], float] = time.time,
     ) -> None:
         self.fetch = fetch
+        self.clock = clock
+        # Unix time before which Spotify asked not to be asked again.
+        self.paused_until = paused_until
+        self.changed = False
         # A cached None means Spotify doesn't know the id, so it isn't asked again.
         self.tracks: dict[str, Any] = tracks or {}
         self.artists: dict[str, Any] = artists or {}
@@ -114,12 +124,21 @@ class Catalog:
             body = json.loads(s3.get_object(Bucket=bucket, Key=CATALOG_KEY)["Body"].read())
         except s3.exceptions.NoSuchKey:
             body = {}
-        return cls(fetch, body.get("tracks"), body.get("artists"), budget)
+        return cls(
+            fetch, body.get("tracks"), body.get("artists"), budget, body.get("paused_until", 0)
+        )
+
+    @property
+    def paused(self) -> bool:
+        return self.clock() < self.paused_until
 
     def save(self, s3: Any, bucket: str) -> None:
-        if not self.lookups:
+        if not self.changed:
             return
-        body = json.dumps({"tracks": self.tracks, "artists": self.artists}, ensure_ascii=False)
+        body = json.dumps(
+            {"tracks": self.tracks, "artists": self.artists, "paused_until": self.paused_until},
+            ensure_ascii=False,
+        )
         s3.put_object(
             Bucket=bucket, Key=CATALOG_KEY, Body=body.encode(), ContentType="application/json"
         )
@@ -129,19 +148,22 @@ class Catalog:
     ) -> dict[str, Any] | None:
         if key in cache:
             return cache[key]
-        if self.stopped or self.lookups >= self.budget:
+        if self.stopped or self.paused or self.lookups >= self.budget:
             return None
         self.lookups += 1
         try:
             found = self.fetch(f"{path}/{key}")
         except RateLimited as e:
-            log.warning("catalog lookups stopped for this run: %s", e)
+            log.warning("catalog lookups paused: %s", e)
             self.stopped = True
+            self.paused_until = self.clock() + e.wait_s
+            self.changed = True
             return None
         except Exception:
             log.exception("looking up %s/%s failed", path, key)
             return None
         cache[key] = entry(found) if found else None
+        self.changed = True
         return cache[key]
 
     def track(self, track_id: str) -> dict[str, Any] | None:
