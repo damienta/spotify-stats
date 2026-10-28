@@ -1,4 +1,5 @@
 import { Artwork } from '@/components/Artwork'
+import BlurText from '@/components/BlurText'
 import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
 import { MinutesChart } from '@/components/MinutesChart'
@@ -13,12 +14,16 @@ import type { Period, TopRow, Totals } from '@/lib/types'
 
 function Header() {
   const me = useMe()
+  const name = me.data?.display_name
   return (
-    <header className="pr-12">
-      <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-        {greeting()},
-        <br />
-        <span className="text-accent">{me.data?.display_name ?? ' '}</span>
+    <header className="pr-12 md:pr-0">
+      {/* The greeting un-blurs word by word; screen readers get the plain sentence. */}
+      <h1 className="min-h-[2.5em] text-4xl font-extrabold tracking-tight sm:text-5xl">
+        <span className="sr-only">
+          {greeting()}, {name}
+        </span>
+        <BlurText text={`${greeting()},`} delay={80} />
+        {name && <BlurText key={name} text={name} delay={80} className="text-accent" />}
       </h1>
     </header>
   )
