@@ -5,12 +5,16 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Nav, type Tab } from './components/Nav'
 import { Skeleton } from './components/States'
 import { finishLogin, getToken } from './lib/api'
+import { useSettings } from './lib/settings'
 
 // Each screen is its own download, so the first visit only loads what it shows: the login
 // screen's WebGL aurora and the Stats charts aren't fetched until they're needed.
 const Home = lazy(() => import('./screens/Home').then((m) => ({ default: m.Home })))
 const Login = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })))
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })))
+const Settings = lazy(() =>
+  import('./screens/Settings').then((m) => ({ default: m.Settings })),
+)
 const Top = lazy(() => import('./screens/Top').then((m) => ({ default: m.Top })))
 
 const TAB_KEY = 'spotify-stats.tab'
@@ -20,7 +24,7 @@ const loginError = finishLogin()
 function savedTab(): Tab {
   try {
     const tab = localStorage.getItem(TAB_KEY)
-    return tab === 'top' || tab === 'stats' ? tab : 'home'
+    return tab === 'top' || tab === 'stats' || tab === 'settings' ? tab : 'home'
   } catch {
     return 'home'
   }
@@ -38,6 +42,7 @@ function Loading() {
 
 export function App() {
   const [tab, setTab] = useState<Tab>(savedTab)
+  const settings = useSettings()
 
   if (!getToken()) {
     return (
@@ -58,8 +63,8 @@ export function App() {
   }
 
   return (
-    // Animations follow the device's "reduce motion" setting.
-    <MotionConfig reducedMotion="user">
+    // Animations follow the device's "reduce motion" setting, unless Settings says reduce.
+    <MotionConfig reducedMotion={settings.motion === 'reduce' ? 'always' : 'user'}>
       <div className="min-h-screen">
         <a
           href="#main"
@@ -87,6 +92,7 @@ export function App() {
                   {tab === 'home' && <Home onSeeAll={() => go('top')} />}
                   {tab === 'top' && <Top />}
                   {tab === 'stats' && <Stats />}
+                  {tab === 'settings' && <Settings />}
                 </Suspense>
               </ErrorBoundary>
             </motion.div>

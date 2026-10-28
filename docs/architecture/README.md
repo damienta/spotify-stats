@@ -151,6 +151,7 @@ Spotify live.
 | `GET /me/stats/{stat}?window=` | One stat document |
 | `GET /me/now-playing` | Live from Spotify, cached 5 s per user |
 | `GET /me/recent?limit=` | Live from Spotify; stores plays the poller hasn't yet |
+| `DELETE /me` | Deletes the account: user record, every stat document, every S3 file of plays |
 
 Session tokens are HMAC-signed by the API (`sessions.py`), so no session table is needed.
 

@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -15,10 +16,16 @@ export function Section({
 }) {
   return (
     <section className={cn('flex flex-col gap-3', className)}>
-      <div className="flex items-baseline justify-between px-1">
+      <motion.div
+        className="flex items-baseline justify-between px-1"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4 }}
+      >
         <h2 className="text-lg font-bold tracking-tight">{title}</h2>
         {action}
-      </div>
+      </motion.div>
       {children}
     </section>
   )
