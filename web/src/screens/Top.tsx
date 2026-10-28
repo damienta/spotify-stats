@@ -31,12 +31,14 @@ const RANGES: { value: Range; label: string }[] = [
 ]
 
 // A short list reads better; the rest (up to 100) is one tap away.
-const SHORT_LIST = 10
+// The list grows in steps: top 10, then 50, then 100.
+const STEPS = [10, 50, 100]
 
 function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
   return (
     <SpotlightCard className="p-0 transition-colors hover:bg-white/10">
-      <MaybeLink href={row.url} className="flex items-center gap-5 p-5">
+      {/* On phones the minutes drop to their own line so the name has room. */}
+      <MaybeLink href={row.url} className="flex flex-wrap items-center gap-5 p-5 sm:flex-nowrap">
         <Artwork
           src={row.image}
           name={row.name}
@@ -50,7 +52,7 @@ function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
           </h2>
           {row.artist_name && <p className="truncate text-muted">{row.artist_name}</p>}
         </div>
-        <div className="shrink-0 text-right">
+        <div className="w-full shrink-0 sm:w-auto sm:text-right">
           <p className="text-lg font-bold">
             <Minutes value={row.hours * 60} />
           </p>
@@ -94,14 +96,17 @@ function Row({ row, rank, kind }: { row: TopRow; rank: number; kind: Kind }) {
 
 function TopList({ kind, range }: { kind: Kind; range: Range }) {
   const top = useStat<TopRow[]>(`top_${kind}`, range)
-  const [expanded, setExpanded] = useState(false)
+  const [step, setStep] = useState(0)
   if (top.isError) return <Problem error={top.error} onRetry={() => top.refetch()} />
   if (!top.data) return <Skeleton className="h-96" />
   if (!top.data.length) {
     return <p className="py-6 text-center text-sm text-muted">Nothing played in this time yet.</p>
   }
   const [first, ...rest] = top.data
-  const shown = expanded ? rest : rest.slice(0, SHORT_LIST - 1)
+  const limit = STEPS[step]
+  const shown = rest.slice(0, limit - 1)
+  // The next step, until everything is on screen.
+  const next = top.data.length > limit ? STEPS[step + 1] : undefined
   return (
     <div className="space-y-3">
       <Leader row={first} kind={kind} />
@@ -112,11 +117,15 @@ function TopList({ kind, range }: { kind: Kind; range: Range }) {
               <Row key={`${row.name}-${row.artist_name}`} row={row} rank={i + 2} kind={kind} />
             ))}
           </ol>
-          {top.data.length > SHORT_LIST && (
+          {top.data.length > STEPS[0] && (
             <div className="flex justify-center p-2">
-              <Button variant="glass" size="sm" onClick={() => setExpanded(!expanded)}>
-                {expanded ? 'Show top 10' : `Show top ${top.data.length}`}
-                <ChevronDown className={expanded ? 'size-4 rotate-180' : 'size-4'} />
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={() => setStep(next ? step + 1 : 0)}
+              >
+                {next ? `Show top ${Math.min(next, top.data.length)}` : 'Show top 10'}
+                <ChevronDown className={next ? 'size-4' : 'size-4 rotate-180'} />
               </Button>
             </div>
           )}

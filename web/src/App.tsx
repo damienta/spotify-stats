@@ -1,12 +1,10 @@
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { LogOut } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Nav, type Tab } from './components/Nav'
 import { Skeleton } from './components/States'
-import { Button } from './components/ui/button'
-import { finishLogin, getToken, logout } from './lib/api'
+import { finishLogin, getToken } from './lib/api'
 
 // Each screen is its own download, so the first visit only loads what it shows: the login
 // screen's WebGL aurora and the Stats charts aren't fetched until they're needed.
@@ -72,20 +70,9 @@ export function App() {
         {/* A soft green glow behind the top of every page. */}
         <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(60%_80%_at_30%_0%,rgba(29,185,84,0.22),transparent_70%)]" />
         <Nav tab={tab} onChange={go} />
-        {/* Logout stays in the top corner on every tab. */}
-        <Button
-          variant="glass"
-          size="icon"
-          onClick={logout}
-          aria-label="Log out"
-          title="Log out"
-          className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:top-6 md:right-6"
-        >
-          <LogOut className="size-4" />
-        </Button>
         <main
           id="main"
-          className="relative mx-auto max-w-3xl px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-32 md:pl-64 md:pb-12 lg:max-w-5xl"
+          className="relative mx-auto max-w-3xl px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-32 md:pt-28 md:pb-12 lg:max-w-5xl"
         >
           <AnimatePresence mode="wait">
             <motion.div
