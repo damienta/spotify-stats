@@ -1,4 +1,6 @@
 // From React Bits (https://reactbits.dev): a soft light follows the pointer across the card.
+// Added here: each card fades up the first time it scrolls into view.
+import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -49,8 +51,12 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
   };
 
   return (
-    <div
+    <motion.div
       ref={divRef}
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
       onMouseMove={handleMouseMove}
       onFocus={handleFocus}
       onBlur={handleBlur}
@@ -66,7 +72,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
         }}
       />
       {children}
-    </div>
+    </motion.div>
   );
 };
 

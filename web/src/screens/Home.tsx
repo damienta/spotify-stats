@@ -16,7 +16,7 @@ function Header() {
   const me = useMe()
   const name = me.data?.display_name
   return (
-    <header className="pr-12 md:pr-0">
+    <header className="pr-24 md:pr-0">
       {/* The greeting un-blurs word by word; screen readers get the plain sentence. */}
       <h1 className="min-h-[2.5em] text-4xl font-extrabold tracking-tight sm:text-5xl">
         <span className="sr-only">

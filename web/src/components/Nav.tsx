@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChartLine, House, LogOut, Trophy } from 'lucide-react'
+import { ChartLine, House, LogOut, Settings, Trophy } from 'lucide-react'
 
 import { logout } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { ProgressiveBlur } from './skiper/progressive-blur'
 import { Button } from './ui/button'
 
-export type Tab = 'home' | 'top' | 'stats'
+export type Tab = 'home' | 'top' | 'stats' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: typeof House }[] = [
   { id: 'home', label: 'Home', icon: House },
@@ -15,18 +15,33 @@ const TABS: { id: Tab; label: string; icon: typeof House }[] = [
   { id: 'stats', label: 'Stats', icon: ChartLine },
 ]
 
-function LogoutButton({ className }: { className?: string }) {
+/** Settings and logout: on every tab, in the corner on phones and in the bar on wider screens. */
+function Corner({
+  tab,
+  onChange,
+  className,
+}: {
+  tab: Tab
+  onChange: (tab: Tab) => void
+  className?: string
+}) {
   return (
-    <Button
-      variant="glass"
-      size="icon"
-      onClick={logout}
-      aria-label="Log out"
-      title="Log out"
-      className={className}
-    >
-      <LogOut className="size-4" />
-    </Button>
+    <div className={cn('flex gap-2', className)}>
+      <Button
+        variant="glass"
+        size="icon"
+        onClick={() => onChange('settings')}
+        aria-label="Settings"
+        aria-current={tab === 'settings' ? 'page' : undefined}
+        title="Settings"
+        className={cn(tab === 'settings' && 'text-accent')}
+      >
+        <Settings className="size-4" />
+      </Button>
+      <Button variant="glass" size="icon" onClick={logout} aria-label="Log out" title="Log out">
+        <LogOut className="size-4" />
+      </Button>
+    </div>
   )
 }
 
@@ -40,8 +55,11 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
       <div className="pointer-events-none fixed inset-x-0 top-0 z-10 hidden h-24 md:block">
         <ProgressiveBlur position="top" height="100%" backgroundColor="#121212" />
       </div>
-      {/* On phones logout floats in the top corner; on wider screens it sits in the bar. */}
-      <LogoutButton className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:hidden" />
+      <Corner
+        tab={tab}
+        onChange={onChange}
+        className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:hidden"
+      />
       <nav
         className={cn(
           'glass fixed z-20 flex items-center rounded-full p-1.5',
@@ -76,7 +94,7 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
             </button>
           ))}
         </div>
-        <LogoutButton className="hidden md:inline-flex" />
+        <Corner tab={tab} onChange={onChange} className="hidden md:flex" />
       </nav>
     </>
   )

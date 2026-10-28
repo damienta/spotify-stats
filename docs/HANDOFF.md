@@ -49,6 +49,9 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #31 | Web: direct Spotify links everywhere, top 10 that expands, "minutes", aligned Today |
 | #32 | Remember Spotify's back-off in the cache file |
 | #33 | Web: code splitting, lazy images, home-screen manifest, accessibility, error boundaries, "updated X ago" |
+| #34 | Caching docs, decisions, plan |
+| #35 | Web: top navbar on desktop, animated greeting, top 10 → 50 → 100 |
+| #36 | Settings (text size, animations), `DELETE /me` "delete my data", cards fade in |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things
@@ -86,14 +89,22 @@ sees them.
 
 ## Next steps
 
+**Before Stage 2, in this order** (agreed 2026-10-28)
+1. **Concerts:** "your artists on tour" from the Ticketmaster Discovery API (free key, affiliate
+   links through Impact), plus SeatGeek or Skiddle; matched to your top artists, cached daily.
+   No scraping: AXS / AEG and DICE have no public API.
+2. **Host the web app:** Cloudflare Pages on a new project/subdomain, API CORS for that address,
+   the address added to Spotify's redirect URIs and the API's allowed redirects.
+3. **Spotify quota extension:** needs the hosted site, a privacy page and delete-my-data (done).
+
 **Soon (small)**
 1. Rename the Top tab (suggested "Charts").
 2. Now playing returns `fetched_at`, so the progress bar is exact through the 5-second cache.
 3. Delete stat documents whose names no longer exist; close leftover PRs #4 and #15.
 
-**Settings page** (your plan)
-- Text size (normal, large, extra large), high-contrast mode, colour themes (Spotify green,
-  plus a few accents), reduce motion on or off, time as minutes or hours.
+**Settings page** (text size and animations done in #36; still to add)
+- High-contrast mode, colour themes (Spotify green, plus a few accents), time as minutes or
+  hours.
 - Stored in the browser first; later in the users table so it follows you to the phone app.
 - Built on Tailwind theme variables, so a theme is a different set of colour tokens.
 

@@ -29,7 +29,10 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 - [x] Top 100 with expand, direct Spotify links everywhere, remembered Spotify back-off
 - [x] Web: code splitting, lazy images, home-screen manifest, accessibility, error boundaries
 - [ ] Rename the Top tab (suggested: Charts)
-- [ ] Settings: text size, high contrast, colour themes, reduce motion, minutes vs hours
+- [x] Top navbar, top 10 → 50 → 100, Settings (text size, animations), delete my data
+- [ ] Concerts: your top artists' upcoming gigs (Ticketmaster Discovery API + affiliate links)
+- [ ] Host the web app (Cloudflare Pages) and request Spotify's quota extension
+- [ ] Settings, more: high contrast, colour themes, minutes vs hours
 - [ ] Catalogue queue: a steady trickle of lookups instead of bursts; new users first
 - [ ] Mobile app (Expo / React Native, runs in Expo Go): login, Home, Top, Stats
 

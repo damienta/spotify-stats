@@ -54,6 +54,19 @@ export function logout() {
   window.location.assign('/')
 }
 
+/** Delete the account and all of its data, then log out. */
+export async function deleteAccount() {
+  if (!demo) {
+    const response = await fetch('/api/me', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    })
+    // 404: already gone, which is what was asked for.
+    if (!response.ok && response.status !== 404) throw new ApiError(response.status, 'delete failed')
+  }
+  logout()
+}
+
 export async function api<T>(path: string): Promise<T> {
   if (demo) return demoApi(path) as Promise<T>
   const response = await fetch(`/api${path}`, {

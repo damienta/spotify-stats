@@ -128,3 +128,7 @@ few.
 - Hosting the web app, CORS, and a privacy page with "delete my data".
 - More than 25 users: Spotify's development mode limit.
 - Automatic deploys, once the AWS account allows GitHub OIDC.
+| **Desktop nav across the top; bottom bar on phones** | The sidebar left a mostly empty column; the bottom bar stays in thumb reach |
+| **Settings kept in the browser (for now)** | Text size and animations need no backend; they can move to the users table for the phone app |
+| **`DELETE /me` deletes the user record first** | The poller and stats job stop at once; then stats and every S3 file under `uploads/`, `raw/` and `listens/` for that user. The shared picture cache has no personal data, so it stays. Required for Spotify's quota extension and good practice (GDPR) |
+| **Concerts from official APIs, not scraping** | Ticketmaster, SeatGeek and Skiddle offer free keys and affiliate links; scraping breaks their terms and gets blocked |
