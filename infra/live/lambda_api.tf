@@ -21,7 +21,7 @@ resource "aws_iam_role_policy_attachment" "api_logs" {
 data "aws_iam_policy_document" "api" {
   statement {
     sid       = "ManageUsers"
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
     resources = [aws_dynamodb_table.users.arn]
   }
 
@@ -39,6 +39,34 @@ data "aws_iam_policy_document" "api" {
     sid       = "ReadStats"
     actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:BatchGetItem"]
     resources = [aws_dynamodb_table.stats.arn]
+  }
+
+  # DELETE /me: a user's stat documents and every file of their plays.
+  statement {
+    sid       = "DeleteAccountStats"
+    actions   = ["dynamodb:DeleteItem", "dynamodb:BatchWriteItem"]
+    resources = [aws_dynamodb_table.stats.arn]
+  }
+
+  statement {
+    sid       = "ListAccountFiles"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.data.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["uploads/user=*", "raw/source=api/user=*", "listens/user=*"]
+    }
+  }
+
+  statement {
+    sid     = "DeleteAccountFiles"
+    actions = ["s3:DeleteObject"]
+    resources = [
+      "${aws_s3_bucket.data.arn}/uploads/user=*",
+      "${aws_s3_bucket.data.arn}/raw/source=api/user=*",
+      "${aws_s3_bucket.data.arn}/listens/user=*",
+    ]
   }
 
   statement {
