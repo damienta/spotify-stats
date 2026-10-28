@@ -309,3 +309,45 @@ def test_recent_is_newest_first_and_stores_new_plays(client):
 
 def test_recent_rejects_silly_limits(client):
     assert client.get("/me/recent", params={"limit": 500}, headers=auth()).status_code == 422
+
+
+def test_delete_me_removes_everything_of_that_user(client):
+    put_user()
+    UsersTable(boto3.resource("dynamodb").Table("users")).put(
+        new_user("u2", "Friend", Tokens("a", "r", 9e9))
+    )
+    stats = boto3.resource("dynamodb").Table("stats")
+    for user in ("u1", "u2"):
+        stats.put_item(Item={"user_id": user, "stat_name": "totals#4_weeks", "data": {}})
+        stats.put_item(Item={"user_id": user, "stat_name": "_meta", "data": {}})
+    s3 = boto3.client("s3")
+    for key in (
+        "listens/user=u1/source=api/1.jsonl",
+        "listens/user=u1/source=export/export.parquet",
+        "raw/source=api/user=u1/date=2026-10-28/1.json",
+        "uploads/user=u1/export.zip",
+        "listens/user=u2/source=api/1.jsonl",
+        "listens/user=u10/source=api/1.jsonl",
+        "catalog/spotify.json",
+    ):
+        s3.put_object(Bucket="data", Key=key, Body=b"x")
+
+    assert client.delete("/me", headers=auth()).status_code == 204
+
+    users = UsersTable(boto3.resource("dynamodb").Table("users"))
+    assert users.get("u1") is None
+    assert users.get("u2") is not None
+    left = {(i["user_id"], i["stat_name"]) for i in stats.scan()["Items"]}
+    assert left == {("u2", "totals#4_weeks"), ("u2", "_meta")}
+    keys = {o["Key"] for o in s3.list_objects_v2(Bucket="data")["Contents"]}
+    # Other users (even one whose id starts the same) and the shared picture cache stay.
+    assert keys == {
+        "listens/user=u2/source=api/1.jsonl",
+        "listens/user=u10/source=api/1.jsonl",
+        "catalog/spotify.json",
+    }
+    assert client.get("/me", headers=auth()).status_code == 404
+
+
+def test_delete_me_needs_a_session(client):
+    assert client.delete("/me").status_code == 401

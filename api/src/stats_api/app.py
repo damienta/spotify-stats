@@ -8,6 +8,7 @@ GET /me/stats                            the stat names available
 GET /me/stats/{stat}?window=4_weeks      one stat document, e.g. top_tracks, habits, wrapped
 GET /me/now-playing                      the track playing right now, live from Spotify
 GET /me/recent?limit=20                  recently played tracks, live from Spotify
+DELETE /me                               delete the account and every play and stat stored
 """
 
 from __future__ import annotations
@@ -43,9 +44,11 @@ from stats_ingest.storage import (
     SSM_PREFIX,
     User,
     UsersTable,
+    delete_prefix,
     env,
     new_user,
     spotify_config_from_ssm,
+    user_prefixes,
 )
 
 # Where the login may send people back to: the Expo dev app, the built app, or a local page.
@@ -341,6 +344,34 @@ def recent(
             {"played_at": i["played_at"], "track": track_summary(i["track"])} for i in newest_first
         ]
     }
+
+
+@app.delete("/me", status_code=204)
+def delete_me(
+    user_id: UserIdDep, users: UsersDep, stats: StatsDep, s3: S3Dep, bucket: BucketDep
+) -> None:
+    """Delete the account. The user record goes first, so the poller and the stats job stop
+    picking this user up; then their stat documents; then every file of plays in S3. The
+    shared picture cache holds no personal data, so it stays."""
+    users.delete(user_id)
+    _now_playing_cache.pop(user_id, None)
+    stat_names, kwargs = [], {}
+    while True:
+        page = stats.query(
+            KeyConditionExpression="user_id = :u",
+            ExpressionAttributeValues={":u": user_id},
+            ProjectionExpression="stat_name",
+            **kwargs,
+        )
+        stat_names.extend(i["stat_name"] for i in page["Items"])
+        if "LastEvaluatedKey" not in page:
+            break
+        kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+    with stats.batch_writer() as batch:
+        for name in stat_names:
+            batch.delete_item(Key={"user_id": user_id, "stat_name": name})
+    files = sum(delete_prefix(s3, bucket, prefix) for prefix in user_prefixes(user_id))
+    log.info("deleted user %s: %d stats, %d files", user_id, len(stat_names), files)
 
 
 handler = Mangum(app, lifespan="off")

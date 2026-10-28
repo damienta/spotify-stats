@@ -37,6 +37,26 @@ def export_listens_key(user_id: str) -> str:
     return f"{listens_prefix(user_id)}source=export/export.parquet"
 
 
+def user_prefixes(user_id: str) -> list[str]:
+    """Every S3 prefix holding one user's data; deleting an account empties all of them."""
+    return [
+        f"uploads/user={user_id}/",
+        f"raw/source=api/user={user_id}/",
+        listens_prefix(user_id),
+    ]
+
+
+def delete_prefix(s3: Any, bucket: str, prefix: str) -> int:
+    """Delete every object under a prefix, 1000 per request. Returns how many went."""
+    deleted = 0
+    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+        keys = [{"Key": o["Key"]} for o in page.get("Contents", [])]
+        if keys:
+            s3.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True})
+            deleted += len(keys)
+    return deleted
+
+
 def raw_api_key(user_id: str, fetched_at: datetime) -> str:
     return f"raw/source=api/user={user_id}/date={fetched_at:%Y-%m-%d}/{fetched_at:%H%M%S%f}.json"
 
@@ -79,6 +99,9 @@ class UsersTable:
         item = {k: v for k, v in asdict(user).items() if v is not None}
         item["expires_at"] = Decimal(str(user.expires_at))
         self.table.put_item(Item=item)
+
+    def delete(self, user_id: str) -> None:
+        self.table.delete_item(Key={"user_id": user_id})
 
     def all(self) -> list[User]:
         items, kwargs = [], {}
