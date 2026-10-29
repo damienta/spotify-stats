@@ -8,6 +8,7 @@ import httpx
 from stats_jobs.concerts import (
     CONCERTS_KEY,
     EVENTS_TTL_S,
+    EVENTS_VERSION,
     Concerts,
     TicketmasterLimited,
     concerts_document,
@@ -18,10 +19,10 @@ from stats_jobs.concerts import (
 from stats_jobs.job import write_concerts
 
 
-def tm_event(name, day, status="onsale", city="London"):
+def tm_event(name, day, status="onsale", city="London", url=None):
     return {
         "name": name,
-        "url": f"https://www.ticketmaster.co.uk/{name}",
+        "url": url or f"https://www.ticketmaster.co.uk/{name}",
         "dates": {"start": {"localDate": day, "localTime": "19:30:00"}, "status": {"code": status}},
         "images": [
             {"ratio": "3_2", "width": 640, "url": "https://img/3x2"},
@@ -29,6 +30,17 @@ def tm_event(name, day, status="onsale", city="London"):
             {"ratio": "16_9", "width": 640, "url": "https://img/16x9"},
         ],
         "_embedded": {"venues": [{"name": "O2 Academy", "city": {"name": city}}]},
+        "sales": {
+            "public": {"startDateTime": "2026-10-30T10:00:00Z"},
+            "presales": [
+                {
+                    "name": "Artist Presale",
+                    "startDateTime": "2026-10-28T10:00:00Z",
+                    "endDateTime": "2026-10-30T09:00:00Z",
+                    "description": "not kept",
+                }
+            ],
+        },
     }
 
 
@@ -77,6 +89,15 @@ def test_event_summary_keeps_what_the_app_shows():
         "city": "London",
         "url": "https://www.ticketmaster.co.uk/Gig",
         "image": "https://img/16x9",
+        "status": "onsale",
+        "sale_start": "2026-10-30T10:00:00Z",
+        "presales": [
+            {
+                "name": "Artist Presale",
+                "start": "2026-10-28T10:00:00Z",
+                "end": "2026-10-30T09:00:00Z",
+            }
+        ],
     }
     assert event_summary(tm_event("Gig", "2026-11-14", status="cancelled")) is None
 
@@ -208,3 +229,29 @@ def test_the_key_never_reaches_the_logs(caplog):
     with httpx.Client(transport=transport) as http:
         ticketmaster_fetch(http, "secret-key", sleep=lambda s: None)("/events.json", {})
     assert "secret-key" not in caplog.text
+
+
+def test_the_same_night_listed_twice_is_kept_once_preferring_ticketmaster():
+    promoter = tm_event("DF Presents", "2026-11-14", url="https://www.universe.com/df")
+    tm = FakeTicketmaster(
+        attractions={"Weston Estate": [{"id": "K1", "name": "Weston Estate"}]},
+        events={"K1": [promoter, tm_event("Tour", "2026-11-14"), tm_event("Tour", "2026-11-15")]},
+    )
+    events = Concerts(tm, clock=lambda: 1000).upcoming("Weston Estate")
+    assert [(e["name"], e["date"]) for e in events] == [
+        ("Tour", "2026-11-14"),
+        ("Tour", "2026-11-15"),
+    ]
+
+
+def test_events_cached_before_a_version_bump_are_fetched_again():
+    tm = fake()
+    old = {"K1": {"fetched_at": 1000, "events": []}}  # no "v": cached by an older version
+    concerts = Concerts(
+        tm,
+        attractions={"weston estate": {"id": "K1", "checked_at": 0}},
+        events=old,
+        clock=lambda: 1000,
+    )
+    assert concerts.upcoming("Weston Estate")
+    assert concerts.events["K1"]["v"] == EVENTS_VERSION

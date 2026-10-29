@@ -31,7 +31,8 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 - [ ] Rename the Top tab (suggested: Charts)
 - [x] Top navbar, top 10 → 50 → 100, Settings (text size, animations), delete my data
 - [x] Concerts: your top artists' upcoming UK gigs (Ticketmaster Discovery API)
-- [ ] Ticketmaster affiliate links (Impact), a city or region setting for concerts
+- [x] Home city setting for concerts (London first by default), sale status on each date
+- [ ] Ticketmaster affiliate links (Impact)
 - [ ] Host the web app (Cloudflare Pages) and request Spotify's quota extension
 - [ ] Settings, more: high contrast, colour themes, minutes vs hours
 - [ ] Catalogue queue: a steady trickle of lookups instead of bursts; new users first

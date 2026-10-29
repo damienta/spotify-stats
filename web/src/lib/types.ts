@@ -97,6 +97,11 @@ export interface Gig {
   city: string | null
   url: string
   image: string | null
+  /** Ticketmaster's: onsale, offsale (sold out, or not on sale yet), rescheduled, postponed. */
+  status?: string | null
+  /** When general sale opens (UTC). */
+  sale_start?: string | null
+  presales?: { name: string | null; start: string | null; end: string | null }[]
 }
 
 /** One of your top artists with UK dates announced, from Ticketmaster. */

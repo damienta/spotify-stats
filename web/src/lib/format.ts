@@ -41,6 +41,18 @@ export function greeting(date = new Date()): string {
 }
 
 /** "Sat 29 Nov", with the year only when it isn't this year: "Mon 17 May 2027". */
+/** "Fri 30 Oct, 10:00": when tickets go on sale, in UK time. */
+export function saleTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/London',
+  })
+}
+
 export function gigDate(isoDate: string): string {
   const day = new Date(`${isoDate}T12:00:00`)
   const sameYear = day.getFullYear() === new Date().getFullYear()

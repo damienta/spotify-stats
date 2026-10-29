@@ -1,4 +1,4 @@
-import { ExternalLink, LogOut, Trash2 } from 'lucide-react'
+import { ChevronDown, ExternalLink, LogOut, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Section } from '@/components/Section'
@@ -7,7 +7,13 @@ import SpotlightCard from '@/components/SpotlightCard'
 import { Button } from '@/components/ui/button'
 import { deleteAccount, logout } from '@/lib/api'
 import { useMe } from '@/lib/queries'
-import { type MotionSetting, type TextSize, updateSettings, useSettings } from '@/lib/settings'
+import {
+  CITIES,
+  type MotionSetting,
+  type TextSize,
+  updateSettings,
+  useSettings,
+} from '@/lib/settings'
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -96,6 +102,28 @@ export function Settings() {
                 { value: 'reduce', label: 'Reduce' },
               ]}
             />
+          </Row>
+        </SpotlightCard>
+      </Section>
+
+      <Section title="Concerts">
+        <SpotlightCard className="p-5">
+          <Row label="Home city" hint="Artists playing here come first, with this date shown.">
+            <div className="relative sm:w-80">
+              <select
+                aria-label="Home city"
+                value={settings.city}
+                onChange={(e) => updateSettings({ city: e.target.value })}
+                className="glass h-10 w-full appearance-none rounded-full pr-10 pl-4 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                {CITIES.map((c) => (
+                  <option key={c} value={c} className="bg-neutral-900">
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted" />
+            </div>
           </Row>
         </SpotlightCard>
       </Section>
