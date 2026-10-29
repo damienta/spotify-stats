@@ -120,18 +120,27 @@ function data(stat: string, window: string): unknown {
       return ARTISTS.slice(5).map((artist_name, i) => ({ artist_name, first_played: '2026-10-0' + (i + 2), streams: 40 - i * 6, minutes: 130 - i * 20 }))
     case 'concerts': {
       const soon = (days: number) => ymd(new Date(Date.now() + days * 86_400_000))
-      const venues = [['O2 Academy Brixton', 'London'], ['Albert Hall', 'Manchester'], ['Barrowland', 'Glasgow'], ['Rock City', 'Nottingham']]
-      return [1, 3, 4, 7, 9].map((rank, i) => ({
-        artist: ARTISTS[rank - 1],
+      const venues = [['Barrowland', 'Glasgow'], ['Albert Hall', 'Manchester'], ['Rock City', 'Nottingham'], ['O2 Academy Brixton', 'London'], ['O2 Academy', 'Birmingham']]
+      const hours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString()
+      // A mix: on sale, presale now, general sale soon, sold out; some tours skip London.
+      const sales = [
+        { status: 'onsale', sale_start: hours(-500), presales: [] },
+        { status: 'offsale', sale_start: hours(14), presales: [{ name: 'Artist Presale', start: hours(-10), end: hours(13) }] },
+        { status: 'offsale', sale_start: hours(60), presales: [] },
+        { status: 'offsale', sale_start: hours(-300), presales: [] },
+      ]
+      return [1, 3, 4, 7, 9, 12, 15].map((rank, i) => ({
+        artist: ARTISTS[(rank - 1) % ARTISTS.length],
         rank,
-        events: Array.from({ length: 1 + (i % 3) }, (_, j) => ({
-          name: `${ARTISTS[rank - 1]} live`,
+        events: Array.from({ length: 1 + ((i * 2) % 5) }, (_, j) => ({
+          name: `${ARTISTS[(rank - 1) % ARTISTS.length]} live`,
           date: soon(12 + i * 9 + j * 3),
           time: '19:30:00',
-          venue: venues[(i + j) % 4][0],
-          city: venues[(i + j) % 4][1],
+          venue: venues[j % 5][0],
+          city: venues[j % 5][1],
           url: 'https://www.ticketmaster.co.uk/',
           image: null,
+          ...sales[i % 4],
         })),
       }))
     }

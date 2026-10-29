@@ -53,6 +53,8 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #35 | Web: top navbar on desktop, animated greeting, top 10 → 50 → 100 |
 | #36 | Settings (text size, animations), `DELETE /me` "delete my data", cards fade in |
 | #37 | Concerts: your top artists' UK dates from Ticketmaster, on Home |
+| #38 | Keep the Ticketmaster key out of the logs |
+| #39 | Concerts: home city first, whole tours, sale status, drag/arrow scrolling |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things

@@ -5,14 +5,22 @@ import { useSyncExternalStore } from 'react'
 
 export type TextSize = 'normal' | 'large' | 'larger'
 export type MotionSetting = 'device' | 'reduce'
+/** Where "your artists on tour" looks first. ANYWHERE keeps them in your favourite order. */
+export const ANYWHERE = 'Anywhere in the UK'
+export const CITIES = [
+  'London', 'Manchester', 'Birmingham', 'Glasgow', 'Leeds', 'Liverpool', 'Bristol',
+  'Newcastle upon Tyne', 'Nottingham', 'Sheffield', 'Brighton', 'Cardiff', 'Edinburgh',
+  'Belfast', ANYWHERE,
+]
 
 export interface Settings {
   textSize: TextSize
   motion: MotionSetting
+  city: string
 }
 
 const KEY = 'spotify-stats.settings'
-const DEFAULTS: Settings = { textSize: 'normal', motion: 'device' }
+const DEFAULTS: Settings = { textSize: 'normal', motion: 'device', city: 'London' }
 // Everything is sized in rem, so changing the root font size scales the whole app.
 const ROOT_SIZE: Record<TextSize, string> = { normal: '100%', large: '112.5%', larger: '125%' }
 
