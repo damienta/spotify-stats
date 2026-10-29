@@ -52,6 +52,7 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #34 | Caching docs, decisions, plan |
 | #35 | Web: top navbar on desktop, animated greeting, top 10 → 50 → 100 |
 | #36 | Settings (text size, animations), `DELETE /me` "delete my data", cards fade in |
+| #37 | Concerts: your top artists' UK dates from Ticketmaster, on Home |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things
@@ -90,7 +91,7 @@ sees them.
 ## Next steps
 
 **Before Stage 2, in this order** (agreed 2026-10-28)
-1. **Concerts:** "your artists on tour" from the Ticketmaster Discovery API (free key, affiliate
+1. ~~**Concerts**~~ (done in #37; affiliate links still to add): "your artists on tour" from the Ticketmaster Discovery API (free key, affiliate
    links through Impact), plus SeatGeek or Skiddle; matched to your top artists, cached daily.
    No scraping: AXS / AEG and DICE have no public API.
 2. **Host the web app:** Cloudflare Pages on a new project/subdomain, API CORS for that address,

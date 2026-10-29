@@ -5,6 +5,9 @@ adds pictures and links to the top lists (stats_jobs.catalog), writes them to th
 stats table, then compacts the poller's small JSON Lines files
 into one Parquet file. Users whose listens haven't changed are skipped, except that everyone is
 rebuilt once a day because rolling windows ("4 weeks") move even without new plays.
+
+Every user's `concerts` document (stats_jobs.concerts) is rewritten each run from their top
+artists, so it stays current even when their stats are skipped.
 """
 
 from __future__ import annotations
@@ -21,8 +24,21 @@ import boto3
 import httpx
 from botocore.config import Config
 
-from stats_ingest.storage import UsersTable, env, listens_prefix, spotify_config_from_ssm
+from stats_ingest.storage import (
+    SSM_PREFIX,
+    UsersTable,
+    env,
+    listens_prefix,
+    spotify_config_from_ssm,
+)
 from stats_jobs.catalog import Catalog, enrich, spotify_fetch
+from stats_jobs.concerts import (
+    SSM_KEY_NAME,
+    Concerts,
+    concerts_document,
+    favourite_artists,
+    ticketmaster_fetch,
+)
 from stats_jobs.documents import build_documents
 from stats_jobs.stats import connect
 from stats_jobs.windows import LOCAL_TZ
@@ -136,6 +152,30 @@ def run_user(
     return JobResult(user_id, len(documents), len(poll_files), pictured=pictured)
 
 
+# Recent favourites and long-time ones both count for "your artists on tour".
+CONCERT_LISTS = ("top_artists#4_weeks", "top_artists#12_months")
+
+
+def write_concerts(user_id: str, *, stats_table: Any, concerts: Concerts, now: datetime) -> int:
+    """Rewrite the user's `concerts` document. Returns how many artists have dates."""
+    lists = []
+    for name in CONCERT_LISTS:
+        item = stats_table.get_item(Key={"user_id": user_id, "stat_name": name}).get("Item")
+        if item:
+            lists.append(json.loads(item["data"]))
+    today = now.astimezone(LOCAL_TZ).date()
+    data = concerts_document(favourite_artists(lists), concerts, today)
+    stats_table.put_item(
+        Item={
+            "user_id": user_id,
+            "stat_name": "concerts",
+            "generated_at": now.isoformat(),
+            "data": json.dumps(data, ensure_ascii=False),
+        }
+    )
+    return len(data)
+
+
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda entry point, run hourly.
 
@@ -159,6 +199,15 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         log.exception("the Spotify catalogue is unavailable; building stats without pictures")
         catalog = None
 
+    try:
+        api_key = ssm().get_parameter(Name=f"{SSM_PREFIX}/{SSM_KEY_NAME}", WithDecryption=True)[
+            "Parameter"
+        ]["Value"]
+        concerts = Concerts.load(s3, bucket, ticketmaster_fetch(http, api_key))
+    except Exception:
+        log.exception("Ticketmaster is unavailable; skipping concerts")
+        concerts = None
+
     results = []
     for user_id in user_ids:
         try:
@@ -177,9 +226,20 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             log.info(json.dumps(asdict(result)))
         except Exception:
             log.exception("stats for %s failed", user_id)
+        if concerts:
+            try:
+                touring = write_concerts(
+                    user_id, stats_table=stats_table, concerts=concerts, now=datetime.now(UTC)
+                )
+                log.info(json.dumps({"user_id": user_id, "artists_touring": touring}))
+            except Exception:
+                log.exception("concerts for %s failed", user_id)
     if catalog:
         catalog.save(s3, bucket)
         log.info(json.dumps({"catalog_lookups": catalog.lookups}))
+    if concerts:
+        concerts.save(s3, bucket)
+        log.info(json.dumps({"ticketmaster_calls": concerts.calls}))
     http.close()
     return {"users": len(results), "built": sum(not r.skipped for r in results)}
 

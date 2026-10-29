@@ -118,6 +118,23 @@ function data(stat: string, window: string): unknown {
       return { skip_rate: 0.18, most_skipped_artists: [] }
     case 'discoveries':
       return ARTISTS.slice(5).map((artist_name, i) => ({ artist_name, first_played: '2026-10-0' + (i + 2), streams: 40 - i * 6, minutes: 130 - i * 20 }))
+    case 'concerts': {
+      const soon = (days: number) => ymd(new Date(Date.now() + days * 86_400_000))
+      const venues = [['O2 Academy Brixton', 'London'], ['Albert Hall', 'Manchester'], ['Barrowland', 'Glasgow'], ['Rock City', 'Nottingham']]
+      return [1, 3, 4, 7, 9].map((rank, i) => ({
+        artist: ARTISTS[rank - 1],
+        rank,
+        events: Array.from({ length: 1 + (i % 3) }, (_, j) => ({
+          name: `${ARTISTS[rank - 1]} live`,
+          date: soon(12 + i * 9 + j * 3),
+          time: '19:30:00',
+          venue: venues[(i + j) % 4][0],
+          city: venues[(i + j) % 4][1],
+          url: 'https://www.ticketmaster.co.uk/',
+          image: null,
+        })),
+      }))
+    }
     case 'on_repeat':
       return TRACKS.slice(0, 5).map((track_name, i) => ({ track_name, artist_name: ARTISTS[i], day: `2026-10-${pad(20 + i)}`, streams: 14 - i * 2 }))
   }
