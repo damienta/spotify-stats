@@ -4,7 +4,7 @@ Like the picture cache, answers are kept in one JSON file shared by every user,
 `catalog/concerts.json`, so an artist two people like is only asked about once:
 
     artist name   → Ticketmaster's id for them (an "attraction"), or None if it has none
-    attraction id → their next few UK events, refreshed about once a day
+    attraction id → their next UK events, refreshed about once a day
 
 Each hourly run then writes every user a `concerts` stat document from the cache: their top
 artists (best of 4 weeks and 12 months) that have dates announced, favourites first.
@@ -33,7 +33,10 @@ CONCERTS_KEY = "catalog/concerts.json"
 SSM_KEY_NAME = "ticketmaster_api_key"
 COUNTRY = "GB"
 ARTISTS_PER_USER = 50
-EVENTS_PER_ARTIST = 3
+# Enough for a whole UK tour, so the app can show the date nearest each user.
+EVENTS_PER_ARTIST = 10
+# Bumped when cached events need fields they don't have; older entries are fetched again.
+EVENTS_VERSION = 2
 EVENTS_TTL_S = 20 * 3600
 # Artists Ticketmaster doesn't know are checked again monthly, in case they start touring.
 UNKNOWN_TTL_S = 30 * 86400
@@ -86,12 +89,18 @@ def _image(images: list[dict[str, Any]]) -> str | None:
 
 
 def event_summary(event: dict[str, Any]) -> dict[str, Any] | None:
-    """The parts of a Ticketmaster event the app shows. None for cancelled ones."""
+    """The parts of a Ticketmaster event the app shows. None for cancelled ones.
+
+    `status` is Ticketmaster's: "onsale", "offsale" (not selling now: sold out, or the sale
+    hasn't started; `sale_start` tells which), "rescheduled" or "postponed".
+    """
     dates = event.get("dates", {})
-    if dates.get("status", {}).get("code") in {"cancelled", "canceled"}:
+    status = dates.get("status", {}).get("code")
+    if status in {"cancelled", "canceled"}:
         return None
     start = dates.get("start", {})
     venue = (event.get("_embedded", {}).get("venues") or [{}])[0]
+    sales = event.get("sales", {})
     return {
         "name": event.get("name"),
         "date": start.get("localDate"),
@@ -100,7 +109,28 @@ def event_summary(event: dict[str, Any]) -> dict[str, Any] | None:
         "city": venue.get("city", {}).get("name"),
         "url": event.get("url"),
         "image": _image(event.get("images", [])),
+        "status": status,
+        "sale_start": sales.get("public", {}).get("startDateTime"),
+        "presales": [
+            {"name": p.get("name"), "start": p.get("startDateTime"), "end": p.get("endDateTime")}
+            for p in sales.get("presales", [])[:3]
+        ],
     }
+
+
+def _on_ticketmaster(event: dict[str, Any]) -> bool:
+    return "ticketmaster." in (event["url"] or "")
+
+
+def _distinct(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One listing per gig: promoters sometimes list the same night again on their own site.
+    The Ticketmaster listing wins, since that's where the ticket link goes."""
+    seen: dict[tuple[str, str], dict[str, Any]] = {}
+    for event in events:
+        key = (event["date"], _name_key(event["city"] or event["venue"] or ""))
+        if key not in seen or (_on_ticketmaster(event) and not _on_ticketmaster(seen[key])):
+            seen[key] = event
+    return list(seen.values())
 
 
 class Concerts:
@@ -175,7 +205,8 @@ class Concerts:
         if attraction is None:
             return []
         cached = self.events.get(attraction)
-        if cached and self.clock() - cached["fetched_at"] < EVENTS_TTL_S:
+        fresh = cached and cached.get("v") == EVENTS_VERSION
+        if fresh and self.clock() - cached["fetched_at"] < EVENTS_TTL_S:
             return cached["events"]
         body = self._call(
             "/events.json",
@@ -183,14 +214,18 @@ class Concerts:
                 "attractionId": attraction,
                 "countryCode": COUNTRY,
                 "sort": "date,asc",
-                "size": EVENTS_PER_ARTIST + 2,
+                "size": EVENTS_PER_ARTIST * 2,
             },
         )
         if body is None:
             return cached["events"] if cached else []
         found = body.get("_embedded", {}).get("events", [])
-        events = [e for e in map(event_summary, found) if e][:EVENTS_PER_ARTIST]
-        self.events[attraction] = {"fetched_at": self.clock(), "events": events}
+        events = _distinct([e for e in map(event_summary, found) if e])[:EVENTS_PER_ARTIST]
+        self.events[attraction] = {
+            "v": EVENTS_VERSION,
+            "fetched_at": self.clock(),
+            "events": events,
+        }
         self.changed = True
         return events
 
