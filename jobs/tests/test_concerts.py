@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, date, datetime
 
 import boto3
@@ -199,3 +200,11 @@ def test_write_concerts_reads_top_artists_and_saves_the_cache(aws):
     cached = json.loads(s3.get_object(Bucket="data", Key=CONCERTS_KEY)["Body"].read())
     assert cached["attractions"]["weston estate"]["id"] == "K1"
     assert Concerts.load(s3, "data", fake()).events["K1"]["events"]
+
+
+def test_the_key_never_reaches_the_logs(caplog):
+    caplog.set_level(logging.DEBUG)
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={}))
+    with httpx.Client(transport=transport) as http:
+        ticketmaster_fetch(http, "secret-key", sleep=lambda s: None)("/events.json", {})
+    assert "secret-key" not in caplog.text
