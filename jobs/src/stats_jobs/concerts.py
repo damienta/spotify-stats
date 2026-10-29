@@ -25,6 +25,8 @@ from typing import Any
 import httpx
 
 log = logging.getLogger()
+# httpx logs every request URL at INFO, and Ticketmaster's key is in the URL: keep it out of logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 API_URL = "https://app.ticketmaster.com/discovery/v2"
 CONCERTS_KEY = "catalog/concerts.json"
