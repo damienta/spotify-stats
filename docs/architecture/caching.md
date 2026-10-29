@@ -95,6 +95,23 @@ Spotify limit recovers. Initials show in the meantime.
 4. **Refresh old entries.** Artists change photos; re-check entries older than a few months.
 5. **Genres from elsewhere.** Last.fm or MusicBrainz, cached the same way.
 
+## The concerts cache
+
+Concerts work the same way, in a second shared file, `catalog/concerts.json`
+(`stats_jobs/concerts.py`):
+
+- **Artist name → Ticketmaster id** ("attraction"), matched on the exact name so a tribute act
+  or a festival with the artist's name doesn't count. Artists Ticketmaster doesn't know are
+  checked again after 30 days.
+- **Ticketmaster id → their next 3 UK events**, refreshed when older than 20 hours.
+
+Every hour the stats job writes each user a `concerts` document: their top artists (best rank
+across 4 weeks and 12 months, top 50) that have UK dates, favourites first. Ticketmaster allows
+5 requests a second and 5,000 a day; calls are spaced 0.25 s apart and a run makes at most 400.
+A first run for one user is about 100 calls (two per artist); after that, about 50 a day, and
+artists shared between users cost nothing extra. The API key is an SSM SecureString,
+`/spotify-stats/ticketmaster_api_key`, read by the job at startup.
+
 ## Why not store the images ourselves?
 
 Spotify's terms want its artwork shown from its own servers, and storing copies would cost

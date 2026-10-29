@@ -88,3 +88,22 @@ export interface Repeat {
   image?: string | null
   url?: string | null
 }
+
+export interface Gig {
+  name: string
+  date: string
+  time: string | null
+  venue: string | null
+  city: string | null
+  url: string
+  image: string | null
+}
+
+/** One of your top artists with UK dates announced, from Ticketmaster. */
+export interface Touring {
+  artist: string
+  rank: number
+  image?: string | null
+  url?: string | null
+  events: Gig[]
+}

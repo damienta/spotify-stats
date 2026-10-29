@@ -4,6 +4,7 @@ import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
 import { MinutesChart } from '@/components/MinutesChart'
 import { NowPlayingCard } from '@/components/NowPlayingCard'
+import { OnTour } from '@/components/OnTour'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
@@ -194,6 +195,7 @@ export function Home({ onSeeAll }: { onSeeAll: () => void }) {
         <RecentlyPlayed />
       </div>
       <TopArtists onSeeAll={onSeeAll} />
+      <OnTour />
     </div>
   )
 }

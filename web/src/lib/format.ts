@@ -39,3 +39,15 @@ export function greeting(date = new Date()): string {
   if (h < 18) return 'Good afternoon'
   return 'Good evening'
 }
+
+/** "Sat 29 Nov", with the year only when it isn't this year: "Mon 17 May 2027". */
+export function gigDate(isoDate: string): string {
+  const day = new Date(`${isoDate}T12:00:00`)
+  const sameYear = day.getFullYear() === new Date().getFullYear()
+  return day.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}
