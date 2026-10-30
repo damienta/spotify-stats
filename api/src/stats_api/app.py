@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import secrets
 import time
@@ -121,11 +122,23 @@ BucketDep = Annotated[str, Depends(get_bucket)]
 app = FastAPI(title="spotify-stats")
 
 
+def hosted_apps() -> set[str]:
+    """The hosted web app's addresses, from APP_HOSTS (comma-separated, e.g. stats.pages.dev)."""
+    return {h.strip().lower() for h in os.environ.get("APP_HOSTS", "").split(",") if h.strip()}
+
+
 def allowed_redirect(uri: str) -> bool:
+    """Login only hands a session token back to our own apps: the phone app, local development,
+    and the hosted site over https, including its preview deployments (<id>.<host>)."""
     url = urlparse(uri)
     if url.scheme in ALLOWED_REDIRECT_SCHEMES:
         return True
-    return url.scheme in {"http", "https"} and url.hostname in ALLOWED_REDIRECT_HOSTS
+    host = url.hostname or ""
+    if url.scheme in {"http", "https"} and host in ALLOWED_REDIRECT_HOSTS:
+        return True
+    return url.scheme == "https" and any(
+        host == app or host.endswith(f".{app}") for app in hosted_apps()
+    )
 
 
 def current_user(settings: SettingsDep, authorization: Annotated[str, Header()] = "") -> str:
