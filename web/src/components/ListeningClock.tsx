@@ -22,10 +22,6 @@ const hour = (h: number) => `${String(h).padStart(2, '0')}:00`
 const pct = (part: number, whole: number) => `${Math.round((100 * part) / Math.max(1, whole))}%`
 // Minutes first, with hours in brackets once it's an hour or more.
 const time = (m: number) => (m >= 60 ? `${minutes(m)} (${duration(m)})` : minutes(m))
-const ordinal = (n: number) => {
-  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
-  return `${n}${s}`
-}
 const sum = (cells: ClockCell[]) => cells.reduce((s, c) => s + c.minutes, 0)
 /** Cell brightness: square root so quiet hours still show next to busy ones. */
 const shade = (m: number, max: number) => (m ? 0.15 + 0.85 * Math.sqrt(m / max) : 0.05)
@@ -61,7 +57,6 @@ export function ListeningClock({ cells }: { cells: ClockCell[] }) {
     minutes: sum(cells.filter((c) => c.hour >= p.from && c.hour < p.to)),
   }))
   const topPart = parts.reduce((a, b) => (b.minutes > a.minutes ? b : a))
-  const average = total / 168
   const label = `When you listen: most on ${DAYS[peak.weekday]}s around ${hour(peak.hour)}; ${DAYS[topDay]} is your biggest day.`
 
   // Arrow keys move the highlighted hour once the chart has focus.
@@ -74,7 +69,6 @@ export function ListeningClock({ cells }: { cells: ClockCell[] }) {
   }
 
   const shown = active ?? (focused ? peak : null)
-  const rank = shown ? ranked.indexOf(shown) + 1 : 0
 
   return (
     <div className="space-y-5">
@@ -149,30 +143,6 @@ export function ListeningClock({ cells }: { cells: ClockCell[] }) {
               {DAYS[shown.weekday]} · {hour(shown.hour)}–{hour((shown.hour + 1) % 24)}
             </p>
             <p className="text-base font-bold text-accent">{time(shown.minutes)}</p>
-            {shown.minutes > 0 ? (
-              <>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-accent"
-                    style={{ width: `${(100 * shown.minutes) / max}%` }}
-                  />
-                </div>
-                <p className="mt-1.5 text-xs text-muted">
-                  {rank === 1
-                    ? 'Your busiest hour of the week'
-                    : `Your ${ordinal(rank)} busiest hour of 168`}
-                </p>
-                <p className="text-xs text-muted">
-                  {shown.minutes >= average
-                    ? `${(shown.minutes / Math.max(1, average)).toFixed(1)}× your average hour`
-                    : `Below your average hour (${minutes(average)})`}
-                  {' · '}
-                  {pct(shown.minutes, total)} of the week
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-muted">Nothing played in this hour</p>
-            )}
           </Tooltip>
         )}
       </div>
@@ -222,10 +192,10 @@ function Tooltip({
   if (!grid || !target) return null
   const box = grid.getBoundingClientRect()
   const rect = target.getBoundingClientRect()
-  const width = Math.min(232, box.width)
+  const width = Math.min(180, box.width)
   const centre = rect.left - box.left + rect.width / 2
   const left = Math.min(Math.max(centre - width / 2, 0), box.width - width)
-  const below = rect.top - box.top < 120
+  const below = rect.top - box.top < 70
   return (
     <div
       role="status"
