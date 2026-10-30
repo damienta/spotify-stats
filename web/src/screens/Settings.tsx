@@ -108,7 +108,7 @@ export function Settings() {
 
       <Section title="Concerts">
         <SpotlightCard className="p-5">
-          <Row label="Home city" hint="Artists playing here come first, with this date shown.">
+          <Row label="Home city" hint="Gigs shows dates here first.">
             <div className="relative sm:w-80">
               <select
                 aria-label="Home city"
@@ -144,10 +144,15 @@ export function Settings() {
               </a>
             </Button>
           </Row>
-          <Row label="Privacy" hint="What we keep about you, and why.">
-            <Button variant="glass" asChild>
-              <a href="/privacy">Read</a>
-            </Button>
+          <Row label="Privacy and terms" hint="What we keep about you, and the rules.">
+            <div className="flex gap-2">
+              <Button variant="glass" asChild>
+                <a href="/privacy">Privacy</a>
+              </Button>
+              <Button variant="glass" asChild>
+                <a href="/terms">Terms</a>
+              </Button>
+            </div>
           </Row>
           <Row label="Delete my data" hint="Your account, plays and stats, from everywhere we store them.">
             <DeleteAccount />

@@ -4,7 +4,7 @@ import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
 import { MinutesChart } from '@/components/MinutesChart'
 import { NowPlayingCard } from '@/components/NowPlayingCard'
-import { OnTour } from '@/components/OnTour'
+import { GigsTeaser } from '@/components/GigsTeaser'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
@@ -185,17 +185,17 @@ function RecentlyPlayed() {
   )
 }
 
-export function Home({ onSeeAll }: { onSeeAll: () => void }) {
+export function Home({ onSeeAll, onGigs }: { onSeeAll: () => void; onGigs: () => void }) {
   return (
     <div className="space-y-8">
       <Header />
       <NowPlayingCard />
+      <GigsTeaser onOpen={onGigs} />
       <div className="grid gap-8 lg:grid-cols-2">
         <Today />
         <RecentlyPlayed />
       </div>
       <TopArtists onSeeAll={onSeeAll} />
-      <OnTour />
     </div>
   )
 }

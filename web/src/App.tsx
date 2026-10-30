@@ -12,11 +12,13 @@ import { useSettings } from './lib/settings'
 const Home = lazy(() => import('./screens/Home').then((m) => ({ default: m.Home })))
 const Login = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })))
 const Privacy = lazy(() => import('./screens/Privacy').then((m) => ({ default: m.Privacy })))
+const Terms = lazy(() => import('./screens/Terms').then((m) => ({ default: m.Terms })))
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })))
 const Settings = lazy(() =>
   import('./screens/Settings').then((m) => ({ default: m.Settings })),
 )
 const Top = lazy(() => import('./screens/Top').then((m) => ({ default: m.Top })))
+const Gigs = lazy(() => import('./screens/Gigs').then((m) => ({ default: m.Gigs })))
 
 const TAB_KEY = 'spotify-stats.tab'
 // Runs once, before the first render: picks up ?token= after "Log in with Spotify".
@@ -25,7 +27,7 @@ const loginError = finishLogin()
 function savedTab(): Tab {
   try {
     const tab = localStorage.getItem(TAB_KEY)
-    return tab === 'top' || tab === 'stats' || tab === 'settings' ? tab : 'home'
+    return tab === 'top' || tab === 'stats' || tab === 'gigs' || tab === 'settings' ? tab : 'home'
   } catch {
     return 'home'
   }
@@ -46,12 +48,9 @@ export function App() {
   const settings = useSettings()
 
   // Readable whether or not you're logged in, so it can be linked from anywhere.
-  if (window.location.pathname === '/privacy') {
-    return (
-      <Suspense fallback={null}>
-        <Privacy />
-      </Suspense>
-    )
+  const page = window.location.pathname
+  if (page === '/privacy' || page === '/terms') {
+    return <Suspense fallback={null}>{page === '/privacy' ? <Privacy /> : <Terms />}</Suspense>
   }
 
   if (!getToken()) {
@@ -99,9 +98,10 @@ export function App() {
             >
               <ErrorBoundary key={tab}>
                 <Suspense fallback={<Loading />}>
-                  {tab === 'home' && <Home onSeeAll={() => go('top')} />}
+                  {tab === 'home' && <Home onSeeAll={() => go('top')} onGigs={() => go('gigs')} />}
                   {tab === 'top' && <Top />}
                   {tab === 'stats' && <Stats />}
+                  {tab === 'gigs' && <Gigs />}
                   {tab === 'settings' && <Settings />}
                 </Suspense>
               </ErrorBoundary>

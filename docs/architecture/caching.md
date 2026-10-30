@@ -111,8 +111,9 @@ Concerts work the same way, in a second shared file, `catalog/concerts.json`
   fields change, `EVENTS_VERSION` goes up and older entries are fetched again.
 
 Every hour the stats job writes each user a `concerts` document: their top artists (best rank
-across 4 weeks and 12 months, top 50) that have UK dates, favourites first. The app then puts
-artists playing the user's home city (a setting, London by default) first. Ticketmaster allows
+across 4 weeks and 12 months, top 50) that have UK dates, favourites first. The Gigs tab lists
+every date soonest first, filtered to the user's home city (a setting, London by default) or
+all of the UK. Ticketmaster allows
 5 requests a second and 5,000 a day; calls are spaced 0.25 s apart and a run makes at most 400.
 A first run for one user is about 100 calls (two per artist); after that, about 50 a day, and
 artists shared between users cost nothing extra. The API key is an SSM SecureString,

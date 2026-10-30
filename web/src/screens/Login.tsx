@@ -1,7 +1,8 @@
-import { Clock3, Flame, ShieldCheck, Ticket, Trophy } from 'lucide-react'
+import { Clock3, Flame, Ticket, Trophy } from 'lucide-react'
 
 import Aurora from '@/components/Aurora'
 import BlurText from '@/components/BlurText'
+import { SiteFooter } from '@/components/SiteFooter'
 import { AnimatedLink } from '@/components/skiper/animated-link'
 import { Button } from '@/components/ui/button'
 import { login } from '@/lib/api'
@@ -13,31 +14,49 @@ const FEATURES = [
   { icon: Ticket, title: 'Gigs', text: 'UK dates for the artists you play most, with tickets.' },
 ]
 
+// Made-up artists (the demo's), so the preview never uses a real artist's name or picture.
+const PREVIEW = [
+  { name: 'Nova Lane', minutes: 1748 },
+  { name: 'The Static', minutes: 1406 },
+  { name: 'Kairo', minutes: 1159 },
+  { name: 'Mellow Fox', minutes: 912 },
+  { name: 'Juno Park', minutes: 760 },
+]
+
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+
 /** A small, static taste of what you see after logging in. */
 function Preview() {
-  const bars = [92, 74, 61, 48, 40]
   return (
     <div
       aria-hidden
       className="glass w-full max-w-sm rotate-1 space-y-4 rounded-3xl p-5 text-left shadow-2xl"
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold">Your top artists</p>
+        <p className="text-sm font-bold">Your top 5 artists</p>
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-muted">4 weeks</span>
       </div>
       <ol className="space-y-2.5">
-        {bars.map((width, i) => (
-          <li key={width} className="flex items-center gap-3 text-sm">
+        {PREVIEW.map((artist, i) => (
+          <li key={artist.name} className="flex items-center gap-3 text-sm">
             <span className="w-3 text-faint tabular">{i + 1}</span>
-            <span className="size-8 shrink-0 rounded-full bg-gradient-to-br from-accent/80 to-emerald-950" />
-            <span className="flex-1">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent">
+              {initials(artist.name)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{artist.name}</span>
               <span
-                className="block h-2 rounded-full bg-accent"
-                style={{ width: `${width}%`, opacity: 1 - i * 0.15 }}
+                className="mt-1 block h-1.5 rounded-full bg-accent"
+                style={{ width: `${(100 * artist.minutes) / PREVIEW[0].minutes}%`, opacity: 1 - i * 0.15 }}
               />
             </span>
             <span className="w-24 text-right text-xs text-muted tabular">
-              {(width * 19).toLocaleString()} minutes
+              {artist.minutes.toLocaleString()} minutes
             </span>
           </li>
         ))}
@@ -94,13 +113,6 @@ export function Login({ error }: { error: string | null }) {
               Login didn't finish ({error}). Try again.
             </p>
           )}
-          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted">
-            <ShieldCheck className="size-4 text-accent" />
-            Read-only: it sees what you play, nothing else. Delete your data any time.
-            <a href="/privacy" className="underline underline-offset-2 hover:text-white">
-              Privacy
-            </a>
-          </p>
         </div>
         <div className="flex justify-center md:justify-end">
           <Preview />
@@ -117,12 +129,7 @@ export function Login({ error }: { error: string | null }) {
         ))}
       </section>
 
-      <footer className="relative mx-auto flex max-w-5xl flex-wrap justify-between gap-2 px-6 pb-8 text-xs text-faint">
-        <span>Not made by or affiliated with Spotify. Gig data from Ticketmaster.</span>
-        <a href="/privacy" className="hover:text-white">
-          Privacy
-        </a>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }

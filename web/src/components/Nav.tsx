@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChartLine, House, LogOut, Settings, Trophy } from 'lucide-react'
+import { ChartLine, House, LogOut, Settings, Ticket, Trophy } from 'lucide-react'
 
 import { logout } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -7,12 +7,13 @@ import { cn } from '@/lib/utils'
 import { ProgressiveBlur } from './skiper/progressive-blur'
 import { Button } from './ui/button'
 
-export type Tab = 'home' | 'top' | 'stats' | 'settings'
+export type Tab = 'home' | 'top' | 'stats' | 'gigs' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: typeof House }[] = [
   { id: 'home', label: 'Home', icon: House },
   { id: 'top', label: 'Top', icon: Trophy },
   { id: 'stats', label: 'Stats', icon: ChartLine },
+  { id: 'gigs', label: 'Gigs', icon: Ticket },
 ]
 
 /** Settings and logout: on every tab, in the corner on phones and in the bar on wider screens. */
