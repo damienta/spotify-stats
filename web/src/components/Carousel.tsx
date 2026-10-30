@@ -6,14 +6,12 @@ import { cn } from '@/lib/utils'
 const FADE = '3rem'
 
 /**
- * A row of cards that scrolls sideways: swipe on phones, drag or use the arrows with a mouse,
- * arrow keys once focused. The edges fade while there's more to see that way.
+ * A row of cards that scrolls sideways: swipe on phones, the arrows with a mouse, arrow keys
+ * once focused. The edges fade while there's more to see that way.
  */
 export function Carousel({ label, children }: { label: string; children: ReactNode }) {
   const row = useRef<HTMLDivElement>(null)
   const [more, setMore] = useState({ before: false, after: false })
-  const [dragging, setDragging] = useState(false)
-  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null)
 
   const measure = useCallback(() => {
     const el = row.current
@@ -50,44 +48,8 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
         aria-label={label}
         tabIndex={0}
         onScroll={measure}
-        // Touch already swipes; this adds drag for a mouse.
-        onPointerDown={(e) => {
-          if (e.pointerType !== 'mouse' || e.button !== 0) return
-          drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false }
-        }}
-        onPointerMove={(e) => {
-          const d = drag.current
-          if (!d) return
-          const dx = e.clientX - d.x
-          if (!d.moved && Math.abs(dx) > 5) {
-            d.moved = true
-            setDragging(true)
-            e.currentTarget.setPointerCapture(e.pointerId)
-          }
-          if (d.moved) e.currentTarget.scrollLeft = d.left - dx
-        }}
-        onPointerUp={() => {
-          // The click that ends a drag mustn't open a link; onClickCapture reads this first.
-          setTimeout(() => (drag.current = null))
-          setDragging(false)
-        }}
-        onPointerCancel={() => {
-          drag.current = null
-          setDragging(false)
-        }}
-        onClickCapture={(e) => {
-          if (drag.current?.moved) {
-            e.preventDefault()
-            e.stopPropagation()
-          }
-        }}
-        onDragStart={(e) => e.preventDefault()}
         style={{ maskImage: mask, WebkitMaskImage: mask }}
-        className={cn(
-          '-mx-4 flex gap-4 overflow-x-auto scroll-px-4 px-4 pb-2 outline-none [scrollbar-width:none]',
-          'focus-visible:ring-2 focus-visible:ring-accent/60',
-          dragging ? 'cursor-grabbing select-none' : 'snap-x snap-mandatory md:cursor-grab',
-        )}
+        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-2 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         {children}
       </div>

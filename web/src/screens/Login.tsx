@@ -11,7 +11,10 @@ export function Login({ error }: { error: string | null }) {
         <Aurora colorStops={['#0b3d1f', '#1db954', '#0b3d1f']} amplitude={1.1} blend={0.6} />
       </div>
       <div className="relative flex max-w-md flex-col items-center gap-6">
-        <img src="/icon.svg" alt="" className="size-14" />
+        <div className="flex items-center gap-3">
+          <img src="/icon.svg" alt="" className="size-12" />
+          <span className="text-2xl font-extrabold tracking-tight">SpotifyStats</span>
+        </div>
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
           <BlurText text="Your listening, in numbers." delay={120} className="justify-center" />
         </h1>
