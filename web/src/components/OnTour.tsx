@@ -127,14 +127,7 @@ export function OnTour() {
   // Stable sort: within each group, the document's favourite-first order stays.
   const ordered = [...(touring.data ?? [])].sort((a, b) => Number(playsHere(b)) - Number(playsHere(a)))
   return (
-    <Section
-      title="Your artists on tour"
-      action={
-        <span className="text-xs text-faint">
-          {city === ANYWHERE ? 'UK dates' : `${city} first`} · Ticketmaster
-        </span>
-      }
-    >
+    <Section title="Your artists on tour">
       {!touring.data ? (
         <div className="flex gap-4">
           {Array.from({ length: 3 }, (_, i) => (

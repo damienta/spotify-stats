@@ -144,6 +144,11 @@ export function Settings() {
               </a>
             </Button>
           </Row>
+          <Row label="Privacy" hint="What we keep about you, and why.">
+            <Button variant="glass" asChild>
+              <a href="/privacy">Read</a>
+            </Button>
+          </Row>
           <Row label="Delete my data" hint="Your account, plays and stats, from everywhere we store them.">
             <DeleteAccount />
           </Row>

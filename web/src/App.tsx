@@ -11,6 +11,7 @@ import { useSettings } from './lib/settings'
 // screen's WebGL aurora and the Stats charts aren't fetched until they're needed.
 const Home = lazy(() => import('./screens/Home').then((m) => ({ default: m.Home })))
 const Login = lazy(() => import('./screens/Login').then((m) => ({ default: m.Login })))
+const Privacy = lazy(() => import('./screens/Privacy').then((m) => ({ default: m.Privacy })))
 const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })))
 const Settings = lazy(() =>
   import('./screens/Settings').then((m) => ({ default: m.Settings })),
@@ -43,6 +44,15 @@ function Loading() {
 export function App() {
   const [tab, setTab] = useState<Tab>(savedTab)
   const settings = useSettings()
+
+  // Readable whether or not you're logged in, so it can be linked from anywhere.
+  if (window.location.pathname === '/privacy') {
+    return (
+      <Suspense fallback={null}>
+        <Privacy />
+      </Suspense>
+    )
+  }
 
   if (!getToken()) {
     return (
