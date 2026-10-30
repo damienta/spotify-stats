@@ -65,7 +65,9 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
       className={cn('glass relative overflow-hidden rounded-3xl p-4', className)}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"
+        // m-0!: a card with space-y-* would otherwise give this overlay a bottom margin, leaving
+        // a flat grey strip along the bottom where the glow stops.
+        className="pointer-events-none absolute inset-0 m-0! opacity-0 transition-opacity duration-500 ease-in-out"
         style={{
           opacity,
           background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`

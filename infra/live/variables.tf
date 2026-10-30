@@ -9,3 +9,9 @@ variable "project" {
   type        = string
   default     = "spotify-stats"
 }
+
+variable "app_hosts" {
+  description = "Hosted web app addresses login may send people back to (e.g. [\"stats-abc.pages.dev\"]). Preview deployments (<id>.<host>) are allowed too. Set in terraform.tfvars."
+  type        = list(string)
+  default     = []
+}

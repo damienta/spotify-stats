@@ -132,6 +132,23 @@ def test_login_refuses_other_redirects(client, uri):
     assert client.get("/auth/login", params={"redirect_uri": uri}).status_code == 400
 
 
+@pytest.mark.parametrize(
+    ("uri", "allowed"),
+    [
+        ("https://stats.pages.dev/auth", True),
+        ("https://1a2b3c.stats.pages.dev/auth", True),  # a preview deployment
+        ("http://stats.pages.dev/auth", False),
+        ("https://evilstats.pages.dev/auth", False),
+        ("https://pages.dev/auth", False),
+        ("https://stats.pages.dev.evil.example/auth", False),
+    ],
+)
+def test_login_allows_the_hosted_app(client, monkeypatch, uri, allowed):
+    monkeypatch.setenv("APP_HOSTS", "stats.pages.dev")
+    status = client.get("/auth/login", params={"redirect_uri": uri}).status_code
+    assert (status == 302) is allowed
+
+
 def test_callback_rejects_forged_state(client):
     assert client.get("/auth/callback", params={"code": "c", "state": "x.y"}).status_code == 400
 

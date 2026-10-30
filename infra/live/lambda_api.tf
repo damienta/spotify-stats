@@ -103,6 +103,7 @@ resource "aws_lambda_function" "api" {
       USERS_TABLE = aws_dynamodb_table.users.name
       STATS_TABLE = aws_dynamodb_table.stats.name
       DATA_BUCKET = aws_s3_bucket.data.bucket
+      APP_HOSTS   = join(",", var.app_hosts)
     }
   }
 
