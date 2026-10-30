@@ -1,5 +1,5 @@
 {
-  "name": "Spotify stats",
+  "name": "SpotifyStats",
   "short_name": "Stats",
   "start_url": "/",
   "display": "standalone",

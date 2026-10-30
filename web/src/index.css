@@ -13,6 +13,17 @@
 }
 
 /* The glass style: translucent white over the dark background, blurred behind. */
+@layer base {
+  /* Tailwind v4 leaves buttons with the arrow cursor; anything clickable should show the hand. */
+  button:not(:disabled),
+  [role="button"],
+  [role="tab"],
+  select,
+  summary {
+    cursor: pointer;
+  }
+}
+
 @utility glass {
   background-color: rgb(255 255 255 / 0.06);
   border: 1px solid rgb(255 255 255 / 0.1);

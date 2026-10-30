@@ -69,7 +69,7 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
       >
         <div className="hidden items-center gap-2 md:flex">
           <img src="/icon.svg" alt="" className="size-7" />
-          <span className="font-bold">Spotify stats</span>
+          <span className="font-bold">SpotifyStats</span>
         </div>
         <div className="flex flex-1 justify-around md:flex-none md:gap-1">
           {TABS.map(({ id, label, icon: Icon }) => (
