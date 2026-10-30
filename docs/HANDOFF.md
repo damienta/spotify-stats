@@ -55,6 +55,9 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #37 | Concerts: your top artists' UK dates from Ticketmaster, on Home |
 | #38 | Keep the Ticketmaster key out of the logs |
 | #39 | Concerts: home city first, whole tours, sale status, drag/arrow scrolling |
+| #40–#41 | Listening clock tiles and tooltip, pointer cursor |
+| #42 | Hosting prep: login and privacy pages, Pages Function proxy, `APP_HOSTS` login redirects |
+| #43 | Gigs tab (date list, city/All UK/On sale filters) and Home teaser; login footer, top 5 preview, Terms page |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things

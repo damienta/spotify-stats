@@ -1,28 +1,13 @@
-import { ArrowLeft } from 'lucide-react'
-import type { ReactNode } from 'react'
-
-function Part({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-bold">{title}</h2>
-      <div className="space-y-2 text-muted">{children}</div>
-    </section>
-  )
-}
+import { ExternalLink, LegalPage, Part } from '@/components/Legal'
 
 /** Plain-English privacy page at /privacy, readable without logging in. */
 export function Privacy() {
   return (
-    <main className="mx-auto max-w-2xl space-y-8 px-6 py-10">
-      <a href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-muted hover:text-white">
-        <ArrowLeft className="size-4" />
-        Back to Stats
-      </a>
-      <header className="space-y-2">
-        <h1 className="text-3xl font-extrabold tracking-tight">Privacy</h1>
-        <p className="text-muted">What Stats keeps about you, why, and how to remove it.</p>
-      </header>
-
+    <LegalPage
+      title="Privacy"
+      intro="What Stats keeps about you, why, and how to remove it."
+      updated="30 October 2026"
+    >
       <Part title="What we read from Spotify">
         <p>
           When you log in, Spotify asks you to let Stats see your profile name and what you've
@@ -64,14 +49,7 @@ export function Privacy() {
           In Settings, <strong className="text-white">Delete my data</strong> removes your account,
           every play and all your stats straight away. To stop Stats reading your Spotify too,
           remove it at{' '}
-          <a
-            href="https://www.spotify.com/account/apps/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-accent underline underline-offset-2"
-          >
-            spotify.com/account/apps
-          </a>
+          <ExternalLink href="https://www.spotify.com/account/apps/">spotify.com/account/apps</ExternalLink>
           .
         </p>
       </Part>
@@ -79,17 +57,10 @@ export function Privacy() {
       <Part title="Questions">
         <p>
           Stats is a personal project, not made by or affiliated with Spotify. Ask anything on{' '}
-          <a
-            href="https://github.com/damienta/spotify-stats/issues"
-            target="_blank"
-            rel="noreferrer"
-            className="text-accent underline underline-offset-2"
-          >
-            GitHub
-          </a>
+          <ExternalLink href="https://github.com/damienta/spotify-stats/issues">GitHub</ExternalLink>
           .
         </p>
       </Part>
-    </main>
+    </LegalPage>
   )
 }
