@@ -104,6 +104,25 @@ export interface Gig {
   presales?: { name: string | null; start: string | null; end: string | null }[]
 }
 
+/** One of your top artists' pages (jobs/src/stats_jobs/artists.py). */
+export interface ArtistPage {
+  name: string
+  minutes: number
+  streams: number
+  tracks: number
+  /** Share of everything you've played, 0 to 1. */
+  share: number
+  first_played: string
+  first_track: string
+  last_played: string
+  /** Your rank in each range, null outside its top 100. */
+  ranks: Record<'4_weeks' | '6_months' | '12_months' | 'all_time', number | null>
+  minutes_by_month: Period[]
+  top_tracks: TopRow[]
+  image?: string | null
+  url?: string | null
+}
+
 /** One of your top artists with UK dates announced, from Ticketmaster. */
 export interface Touring {
   artist: string

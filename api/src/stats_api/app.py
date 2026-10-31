@@ -6,6 +6,7 @@ GET /me                                  who the token belongs to
 GET /me/overview?window=4_weeks          totals and top 5s for the home screen, in one call
 GET /me/stats                            the stat names available
 GET /me/stats/{stat}?window=4_weeks      one stat document, e.g. top_tracks, habits, wrapped
+GET /me/artist?name=<artist>             one of your top artists' pages
 GET /me/now-playing                      the track playing right now, live from Spotify
 GET /me/recent?limit=20                  recently played tracks, live from Spotify
 DELETE /me                               delete the account and every play and stat stored
@@ -45,6 +46,7 @@ from stats_ingest.storage import (
     SSM_PREFIX,
     User,
     UsersTable,
+    artist_stat_name,
     delete_prefix,
     env,
     new_user,
@@ -247,8 +249,23 @@ def get_stat(
     item = stats.get_item(Key={"user_id": user_id, "stat_name": stat_name}).get("Item")
     if item is None:
         raise HTTPException(404, f"{stat_name} isn't available yet")
+    return _document(item)
+
+
+@app.get("/me/artist")
+def get_artist(
+    user_id: UserIdDep, stats: StatsDep, name: Annotated[str, Query(min_length=1, max_length=300)]
+) -> dict[str, Any]:
+    key = {"user_id": user_id, "stat_name": artist_stat_name(name)}
+    item = stats.get_item(Key=key).get("Item")
+    if item is None:
+        raise HTTPException(404, "only your top artists have a page")
+    return _document(item)
+
+
+def _document(item: dict[str, Any]) -> dict[str, Any]:
     return {
-        "stat_name": stat_name,
+        "stat_name": item["stat_name"],
         "generated_at": item["generated_at"],
         "data": json.loads(item["data"]),
     }

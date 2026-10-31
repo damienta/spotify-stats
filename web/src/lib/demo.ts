@@ -1,6 +1,9 @@
 // Demo mode (open the app with ?demo): made-up data in the API's shapes, so the app can be
 // tried, tested and screenshotted without logging in or showing anyone's real listening.
 
+// Used only inside functions, so the import cycle with api.ts is safe.
+import { ApiError } from './api'
+
 const DEMO_KEY = 'spotify-stats.demo'
 
 export function isDemo(): boolean {
@@ -150,6 +153,30 @@ function data(stat: string, window: string): unknown {
   return null
 }
 
+function artist(name: string) {
+  const rank = ARTISTS.findIndex((a) => a.toLowerCase() === name.toLowerCase())
+  if (rank < 0) throw new ApiError(404, 'only your top artists have a page')
+  const now = new Date()
+  const months = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 23 + i, 1)
+    return { start: ymd(d), minutes: i < 4 + rank ? 0 : Math.round((400 + rand() * 900) / (rank + 1)) }
+  })
+  const total = months.reduce((sum, m) => sum + m.minutes, 0)
+  return {
+    name: ARTISTS[rank],
+    minutes: total,
+    streams: Math.round(total / 3.2),
+    tracks: 34 - rank * 2,
+    share: 0.11 / (rank + 1),
+    first_played: months.find((m) => m.minutes)!.start + ' 21:14:00',
+    first_track: TRACKS[(rank + 4) % TRACKS.length],
+    last_played: new Date(Date.now() - (rank + 1) * 3_600_000).toISOString(),
+    ranks: { '4_weeks': rank + 1, '6_months': rank + 2, '12_months': rank + 1, all_time: rank + 3 },
+    minutes_by_month: months,
+    top_tracks: TRACKS.map((t, i) => ({ name: t, artist_name: ARTISTS[rank], streams: Math.round(200 / (i + 1)), hours: total / 60 / 3 / (i + 1.5) })),
+  }
+}
+
 /** Answers an API path the way the real API would, after a short pretend network delay. */
 export async function demoApi(path: string): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 250))
@@ -165,6 +192,7 @@ export async function demoApi(path: string): Promise<unknown> {
       })),
     }
   }
+  if (url.pathname === '/me/artist') return { stat_name: 'artist', generated_at: new Date().toISOString(), data: artist(url.searchParams.get('name') ?? '') }
   const stat = url.pathname.replace('/me/stats/', '')
   const window = url.searchParams.get('window') ?? ''
   return { stat_name: stat, generated_at: new Date().toISOString(), data: data(stat, window) }

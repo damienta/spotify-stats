@@ -60,6 +60,7 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #40–#41 | Listening clock tiles and tooltip, pointer cursor |
 | #42 | Hosting prep: login and privacy pages, Pages Function proxy, `APP_HOSTS` login redirects |
 | #43 | Gigs tab (date list, city/All UK/On sale filters) and Home teaser; login footer, top 5 preview, Terms page |
+| #45 | Artist pages (`/artist/<name>`, `GET /me/artist`), gigs line moved down Home and UK-wide |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things
@@ -103,9 +104,10 @@ sees them.
    `infra/live/terraform.tfvars` as `app_hosts = ["<address>"]` (git-ignored), plan, and apply on
    his word. Spotify's redirect URI doesn't change: Spotify still returns to the Lambda.
 2. **Friends.** Follow [plans/friends.md](plans/friends.md): five PRs, infra first.
-3. **Artist and track pages.** Tap any artist or track for a detail page (minutes by month,
-   first play, top tracks, rank over time, gigs). The stats job precomputes them for each
-   user's top 100; one endpoint; two screens. Not new tabs.
+3. **Track pages.** Artist pages are done (#45): `stats_jobs/artists.py` precomputes one item
+   per top-50 artist of each range (`artist#<hash>`, see `artist_stat_name`), `GET /me/artist`
+   reads it, `web/src/screens/Artist.tsx` shows it. Track pages would follow the same pattern
+   if wanted.
 4. **History upload in the app.** An "Import your history" page: how to request Spotify's
    extended streaming history, a drop zone for the JSON files, progress. Optional, never needed
    to log in. The backend already reads these files (`uploads/user=<id>/`).

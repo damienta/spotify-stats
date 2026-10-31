@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
@@ -9,9 +9,11 @@ import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
+import { useOpenArtist } from '@/lib/artist'
 import { count } from '@/lib/format'
 import { useStat } from '@/lib/queries'
 import type { TopRow } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 // No genres: Spotify stopped returning them to apps like this one.
 type Kind = 'tracks' | 'artists' | 'albums'
@@ -34,11 +36,46 @@ const RANGES: { value: Range; label: string }[] = [
 // The list grows in steps: top 10, then 50, then 100.
 const STEPS = [10, 50, 100]
 
+/** Artists open their page in the app; tracks and albums open in Spotify. */
+function RowLink({
+  row,
+  kind,
+  className,
+  children,
+}: {
+  row: TopRow
+  kind: Kind
+  className: string
+  children: ReactNode
+}) {
+  const openArtist = useOpenArtist()
+  if (kind !== 'artists') {
+    return (
+      <MaybeLink href={row.url} className={className}>
+        {children}
+      </MaybeLink>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => openArtist(row.name)}
+      className={cn('w-full text-left', className)}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
   return (
     <SpotlightCard className="p-0 transition-colors hover:bg-white/10">
       {/* On phones the minutes drop to their own line so the name has room. */}
-      <MaybeLink href={row.url} className="flex flex-wrap items-center gap-5 p-5 sm:flex-nowrap">
+      <RowLink
+        row={row}
+        kind={kind}
+        className="flex flex-wrap items-center gap-5 p-5 sm:flex-nowrap"
+      >
         <Artwork
           src={row.image}
           name={row.name}
@@ -58,7 +95,7 @@ function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
           </p>
           <p className="text-sm text-muted tabular">{count(row.streams)} streams</p>
         </div>
-      </MaybeLink>
+      </RowLink>
     </SpotlightCard>
   )
 }
@@ -66,8 +103,9 @@ function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
 function Row({ row, rank, kind }: { row: TopRow; rank: number; kind: Kind }) {
   return (
     <li>
-      <MaybeLink
-        href={row.url}
+      <RowLink
+        row={row}
+        kind={kind}
         className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/5"
       >
         <span className="w-7 text-right text-sm font-semibold text-faint tabular">{rank}</span>
@@ -89,7 +127,7 @@ function Row({ row, rank, kind }: { row: TopRow; rank: number; kind: Kind }) {
           </p>
           <p className="text-faint tabular">{count(row.streams)} streams</p>
         </div>
-      </MaybeLink>
+      </RowLink>
     </li>
   )
 }
