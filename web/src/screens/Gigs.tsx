@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
 import { Problem, Skeleton } from '@/components/States'
+import { useOpenArtist } from '@/lib/artist'
 import { type GigRow, gigRows, sameCity, ticketState } from '@/lib/gigs'
 import { useStat } from '@/lib/queries'
 import { ANYWHERE, useSettings } from '@/lib/settings'
@@ -33,6 +34,7 @@ function Row({ row, now }: { row: GigRow; now: number }) {
   const { gig } = row
   const day = new Date(`${gig.date}T12:00:00`)
   const tickets = ticketState(gig, now)
+  const openArtist = useOpenArtist()
   return (
     <motion.li
       initial={{ opacity: 0, y: 8 }}
@@ -47,11 +49,10 @@ function Row({ row, now }: { row: GigRow; now: number }) {
         </p>
         <p className="text-xl font-extrabold tabular">{day.getDate()}</p>
       </div>
-      <a
-        href={row.artistUrl ?? undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex min-w-0 flex-1 items-center gap-3"
+      <button
+        type="button"
+        onClick={() => openArtist(row.artist)}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         <Artwork src={row.image} name={row.artist} round className="size-11 shrink-0" />
         <div className="min-w-0">
@@ -61,7 +62,7 @@ function Row({ row, now }: { row: GigRow; now: number }) {
           </p>
           <p className="text-xs text-faint">Your #{row.rank} artist</p>
         </div>
-      </a>
+      </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <a
           href={gig.url}

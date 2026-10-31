@@ -11,6 +11,7 @@ S3 data bucket layout (see infra/live/s3.tf):
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 from collections.abc import Callable, Iterable
@@ -35,6 +36,15 @@ def api_listens_key(user_id: str, fetched_at: datetime) -> str:
 
 def export_listens_key(user_id: str) -> str:
     return f"{listens_prefix(user_id)}source=export/export.parquet"
+
+
+def artist_stat_name(name: str) -> str:
+    """The stats item holding one artist's page, for example `artist#3f2a...`.
+
+    Hashed so any name (spaces, accents, emoji) makes a short, safe key; case-folded so the
+    app finds the page however the name is capitalised.
+    """
+    return f"artist#{hashlib.sha256(name.casefold().encode()).hexdigest()[:16]}"
 
 
 def user_prefixes(user_id: str) -> list[str]:

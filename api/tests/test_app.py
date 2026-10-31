@@ -19,7 +19,7 @@ from stats_api.app import (
 )
 from stats_api.sessions import sign
 from stats_ingest.spotify import SpotifyConfig, Tokens
-from stats_ingest.storage import UsersTable, new_user
+from stats_ingest.storage import UsersTable, artist_stat_name, new_user
 
 SETTINGS = Settings(
     SpotifyConfig("client-id", "client-secret", "https://api.example/auth/callback"),
@@ -190,6 +190,19 @@ def test_users_only_see_their_own_stats(client):
     put_stat("streaks", {"longest": {"days": 1}}, user_id="someone-else")
 
     assert client.get("/me/stats/streaks", headers=auth()).status_code == 404
+
+
+def test_artist_pages_are_found_by_name_whatever_the_case(client):
+    put_stat(artist_stat_name("Jack Wolf"), {"name": "Jack Wolf", "minutes": 12})
+    put_stat(artist_stat_name("Jack Wolf"), {"name": "not yours"}, user_id="someone-else")
+
+    for name in ("Jack Wolf", "jack wolf"):
+        response = client.get("/me/artist", params={"name": name}, headers=auth())
+        assert response.json()["data"] == {"name": "Jack Wolf", "minutes": 12}
+    missing = client.get("/me/artist", params={"name": "Nobody"}, headers=auth())
+    assert missing.status_code == 404
+    assert client.get("/me/artist", params={"name": ""}, headers=auth()).status_code == 422
+    assert client.get("/me/artist", params={"name": "Jack Wolf"}).status_code == 401
 
 
 def test_list_stats_hides_internal_items(client):

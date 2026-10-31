@@ -217,6 +217,9 @@ def _rows(documents: dict[str, dict[str, Any]]) -> list[tuple[tuple, str, str, d
         lists = {base: doc["data"]} if base in LISTS else {}
         if base == "wrapped":
             lists = {name: doc["data"].get(name) or [] for name in LISTS}
+        if base == "artist":
+            # The page's own picture, then its songs' covers.
+            lists = {"top_artists": [doc["data"]], "top_tracks": doc["data"]["top_tracks"]}
         past = window not in WINDOW_ORDER
         order = WINDOW_ORDER.index(window) if not past else len(WINDOW_ORDER)
         for name, rows in lists.items():

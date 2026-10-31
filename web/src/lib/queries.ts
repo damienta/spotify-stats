@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, api, type StatDocument } from './api'
-import type { Me, NowPlaying, Recent } from './types'
+import type { ArtistPage, Me, NowPlaying, Recent } from './types'
 
 // A 4xx won't fix itself on retry (not built yet, reconnect needed); anything else might.
 const retry = (failures: number, error: unknown) =>
@@ -25,6 +25,17 @@ function statQuery<T>(name: string, window?: string) {
 /** One stat document's data, e.g. useStat('top_artists', '4_weeks'). */
 export function useStat<T>(name: string, window?: string) {
   return useQuery({ ...statQuery<T>(name, window), select: (doc) => doc.data })
+}
+
+/** One of your top artists' pages; a 404 means they aren't in your top artists. */
+export function useArtist(name: string) {
+  return useQuery({
+    queryKey: ['stat', 'artist', name.toLowerCase()],
+    queryFn: () => api<StatDocument<ArtistPage>>(`/me/artist?name=${encodeURIComponent(name)}`),
+    retry,
+    staleTime: 5 * 60_000,
+    select: (doc) => doc.data,
+  })
 }
 
 /** When a stat document was built; shares the cached request with useStat. */

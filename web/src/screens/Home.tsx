@@ -8,10 +8,12 @@ import { GigsTeaser } from '@/components/GigsTeaser'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
+import { useOpenArtist } from '@/lib/artist'
 import { ago, count, greeting } from '@/lib/format'
 import { fillPeriod } from '@/lib/periods'
 import { useMe, useRecent, useStat } from '@/lib/queries'
 import type { Period, TopRow, Totals } from '@/lib/types'
+import type { ReactNode } from 'react'
 
 function Header() {
   const me = useMe()
@@ -39,11 +41,37 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Today's top artist opens their page; the top track opens in Spotify. */
+function TodayLink({
+  onClick,
+  href,
+  children,
+}: {
+  onClick?: () => void
+  href?: string | null
+  children: ReactNode
+}) {
+  const className = 'flex w-full items-center gap-3 p-4 text-left'
+  if (!onClick) {
+    return (
+      <MaybeLink href={href} className={className}>
+        {children}
+      </MaybeLink>
+    )
+  }
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {children}
+    </button>
+  )
+}
+
 /** Today's top artist or track, with its picture. */
 function TodayTop({ label, row, round }: { label: string; row?: TopRow; round?: boolean }) {
+  const openArtist = useOpenArtist()
   return (
     <SpotlightCard className="p-0 transition-colors hover:bg-white/10">
-      <MaybeLink href={row?.url} className="flex items-center gap-3 p-4">
+      <TodayLink onClick={round && row ? () => openArtist(row.name) : undefined} href={row?.url}>
         {row ? (
           <>
             <Artwork src={row.image} name={row.name} round={round} className="size-14 shrink-0" />
@@ -62,7 +90,7 @@ function TodayTop({ label, row, round }: { label: string; row?: TopRow; round?: 
             <p className="font-bold">–</p>
           </div>
         )}
-      </MaybeLink>
+      </TodayLink>
     </SpotlightCard>
   )
 }
@@ -104,6 +132,7 @@ function Today() {
 
 function TopArtists({ onSeeAll }: { onSeeAll: () => void }) {
   const top = useStat<TopRow[]>('top_artists', '4_weeks')
+  const openArtist = useOpenArtist()
   return (
     <Section
       title="Your top artists recently"
@@ -122,11 +151,10 @@ function TopArtists({ onSeeAll }: { onSeeAll: () => void }) {
         <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
           {top.data
             ? top.data.slice(0, 10).map((a) => (
-                <a
+                <button
+                  type="button"
                   key={a.name}
-                  href={a.url ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={() => openArtist(a.name)}
                   className="group w-28 shrink-0 text-center"
                 >
                   <Artwork
@@ -139,7 +167,7 @@ function TopArtists({ onSeeAll }: { onSeeAll: () => void }) {
                   <p className="text-xs text-muted">
                     <Minutes value={a.hours * 60} hours={false} />
                   </p>
-                </a>
+                </button>
               ))
             : Array.from({ length: 6 }, (_, i) => (
                 <Skeleton key={i} className="size-28 shrink-0 rounded-full" />
@@ -190,12 +218,12 @@ export function Home({ onSeeAll, onGigs }: { onSeeAll: () => void; onGigs: () =>
     <div className="space-y-8">
       <Header />
       <NowPlayingCard />
-      <GigsTeaser onOpen={onGigs} />
       <div className="grid gap-8 lg:grid-cols-2">
         <Today />
         <RecentlyPlayed />
       </div>
       <TopArtists onSeeAll={onSeeAll} />
+      <GigsTeaser onOpen={onGigs} />
     </div>
   )
 }
