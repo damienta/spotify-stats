@@ -1,9 +1,10 @@
 # Handoff
 
-Where the project stands on the evening of 27 October 2026, how to run it, and what's next. For how it works,
+Where the project stands on 31 October 2026, how to run it, and what's next. For how it works,
 read [architecture/README.md](architecture/README.md); for why, read
 [architecture/decisions.md](architecture/decisions.md); for pictures and caching, read
-[architecture/caching.md](architecture/caching.md).
+[architecture/caching.md](architecture/caching.md). Plans for features not built yet are in
+[plans/](plans/), starting with [plans/friends.md](plans/friends.md).
 
 ## What it is
 
@@ -15,13 +16,14 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 
 | Piece | State |
 |---|---|
-| Your history | 430,966 plays in S3 (`listens/user=bt9tbr9slbgo886lyqicrn4of/…`) |
+| Your history | 430,000+ plays in S3 (`listens/user=<id>/…`) |
 | Poller Lambda | Every 20 min, storing new plays |
-| Stats Lambda | Hourly; 143 documents for you; top 100s ranked by minutes, with pictures and links |
-| Catalogue cache | `catalog/spotify.json`: 422 tracks, 164 artists; Spotify paused lookups until 28 Oct 18:14 |
-| API Lambda | `https://5o2g53vz3bhz4cgroqkvquvosm0dorcs.lambda-url.eu-north-1.on.aws/` |
-| Web app | Local: Home, Top, Stats; real data after login, or `/?demo` |
-| Tests | 116 Python tests; web lint, type-check and build in CI |
+| Stats Lambda | Hourly; your stat documents, the picture cache and the concerts cache (Ticketmaster) |
+| API Lambda | `https://5o2g53vz3bhz4cgroqkvquvosm0dorcs.lambda-url.eu-north-1.on.aws/`; `APP_HOSTS` empty until the site is hosted |
+| Web app | Local (`npm run dev`): login, Home, Top, Stats, Gigs, Settings, Privacy, Terms; `/?demo` for made-up data |
+| Hosting | Ready for Cloudflare Pages (`web/functions/api/[[path]].ts` proxies `/api`), project not created yet |
+| Name | "Stats" for now; no "Spotify" in the name (Spotify's branding rules); "Rewind" is an option |
+| Tests | 136 Python tests; web lint, type-check and build in CI |
 
 ## Everything built, by PR
 
@@ -95,18 +97,27 @@ sees them.
 
 ## Next steps
 
-**Before Stage 2, in this order** (agreed 2026-10-28)
-1. ~~**Concerts**~~ (done in #37; affiliate links still to add): "your artists on tour" from the Ticketmaster Discovery API (free key, affiliate
-   links through Impact), plus SeatGeek or Skiddle; matched to your top artists, cached daily.
-   No scraping: AXS / AEG and DICE have no public API.
-2. **Host the web app:** Cloudflare Pages on a new project/subdomain, API CORS for that address,
-   the address added to Spotify's redirect URIs and the API's allowed redirects.
-3. **Spotify quota extension:** needs the hosted site, a privacy page and delete-my-data (done).
+**Next, in this order** (agreed with Damien, 31 October 2026)
+1. **Host on Cloudflare Pages.** Damien creates the project (root `web`, build `npm run build`,
+   output `dist`, `NODE_VERSION=22`) and sends the `*.pages.dev` address. Then put it in
+   `infra/live/terraform.tfvars` as `app_hosts = ["<address>"]` (git-ignored), plan, and apply on
+   his word. Spotify's redirect URI doesn't change: Spotify still returns to the Lambda.
+2. **Friends.** Follow [plans/friends.md](plans/friends.md): five PRs, infra first.
+3. **Artist and track pages.** Tap any artist or track for a detail page (minutes by month,
+   first play, top tracks, rank over time, gigs). The stats job precomputes them for each
+   user's top 100; one endpoint; two screens. Not new tabs.
+4. **History upload in the app.** An "Import your history" page: how to request Spotify's
+   extended streaming history, a drop zone for the JSON files, progress. Optional, never needed
+   to log in. The backend already reads these files (`uploads/user=<id>/`).
+5. **Spotify quota extension** once there are friends worth more than 25 places.
+
+Done before this list: concerts (#37–#39, now the Gigs tab in #43), Settings and delete my data
+(#36), login, privacy and terms pages (#42–#43). Still open from concerts: Ticketmaster affiliate
+links (Impact).
 
 **Soon (small)**
-1. Rename the Top tab (suggested "Charts").
-2. Now playing returns `fetched_at`, so the progress bar is exact through the 5-second cache.
-3. Delete stat documents whose names no longer exist; close leftover PRs #4 and #15.
+1. Now playing returns `fetched_at`, so the progress bar is exact through the 5-second cache.
+2. Delete stat documents whose names no longer exist; close leftover PRs #4 and #15.
 
 **Settings page** (text size and animations done in #36; still to add)
 - High-contrast mode, colour themes (Spotify green, plus a few accents), time as minutes or
@@ -123,12 +134,6 @@ sees them.
 - Login, Home, Charts, Stats; reuse the API and the web app's types. Libraries:
   expo-glass-effect / expo-blur, Expo Router native tabs, Skia + victory-native charts,
   Reanimated + Moti, expo-haptics, expo-image.
-
-**Friends (up to 25)**
-- Allow-list them in the Spotify dashboard; export upload for others (upload link + importer
-  Lambda); "delete my data" and a privacy page; time zone per user; host the web app (a separate
-  Cloudflare Pages project or S3 + CloudFront) with CORS and the address allowed for login.
-- Then battles: compare minutes, top artists and streaks with a friend.
 
 **Data platform (the CV stages)**
 - Stage 2: Airflow + dbt over the S3 data (star schema, tests), genres from Last.fm.
