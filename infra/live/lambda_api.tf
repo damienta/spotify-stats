@@ -25,6 +25,27 @@ data "aws_iam_policy_document" "api" {
     resources = [aws_dynamodb_table.users.arn]
   }
 
+  # The friends leaderboard reads every friend's name and sharing setting at once.
+  statement {
+    sid       = "ReadFriendUsers"
+    actions   = ["dynamodb:BatchGetItem"]
+    resources = [aws_dynamodb_table.users.arn]
+  }
+
+  # Friendships are written and removed in pairs with TransactWriteItems, which is authorised
+  # by the item-level actions it performs (Put, Delete, ConditionCheck).
+  statement {
+    sid = "ManageFriends"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:Query",
+      "dynamodb:ConditionCheckItem",
+    ]
+    resources = [aws_dynamodb_table.friends.arn]
+  }
+
   # Recently played stores plays the poller hasn't yet, like the poller does.
   statement {
     sid     = "WritePlays"
@@ -100,10 +121,11 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      USERS_TABLE = aws_dynamodb_table.users.name
-      STATS_TABLE = aws_dynamodb_table.stats.name
-      DATA_BUCKET = aws_s3_bucket.data.bucket
-      APP_HOSTS   = join(",", var.app_hosts)
+      USERS_TABLE   = aws_dynamodb_table.users.name
+      STATS_TABLE   = aws_dynamodb_table.stats.name
+      FRIENDS_TABLE = aws_dynamodb_table.friends.name
+      DATA_BUCKET   = aws_s3_bucket.data.bucket
+      APP_HOSTS     = join(",", var.app_hosts)
     }
   }
 

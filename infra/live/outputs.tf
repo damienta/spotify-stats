@@ -13,6 +13,11 @@ output "stats_table" {
   value       = aws_dynamodb_table.stats.name
 }
 
+output "friends_table" {
+  description = "DynamoDB table of friendships, one item per direction."
+  value       = aws_dynamodb_table.friends.name
+}
+
 output "api_url" {
   description = "The API's base URL, for the app."
   value       = aws_lambda_function_url.api.function_url
