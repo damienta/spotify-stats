@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChartLine, House, LogOut, Settings, Ticket, Trophy } from 'lucide-react'
+import { ChartLine, House, LogOut, Settings, Ticket, Trophy, Users } from 'lucide-react'
 
 import { logout } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -7,13 +7,14 @@ import { cn } from '@/lib/utils'
 import { ProgressiveBlur } from './skiper/progressive-blur'
 import { Button } from './ui/button'
 
-export type Tab = 'home' | 'top' | 'stats' | 'gigs' | 'settings'
+export type Tab = 'home' | 'top' | 'stats' | 'gigs' | 'friends' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: typeof House }[] = [
   { id: 'home', label: 'Home', icon: House },
   { id: 'top', label: 'Top', icon: Trophy },
   { id: 'stats', label: 'Stats', icon: ChartLine },
   { id: 'gigs', label: 'Gigs', icon: Ticket },
+  { id: 'friends', label: 'Friends', icon: Users },
 ]
 
 /** Settings and logout: on every tab, in the corner on phones and in the bar on wider screens. */
@@ -79,7 +80,7 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
               onClick={() => onChange(id)}
               aria-current={tab === id ? 'page' : undefined}
               className={cn(
-                'relative flex flex-1 flex-col items-center gap-0.5 rounded-full px-4 py-2 text-[11px] font-semibold transition-colors md:flex-none md:flex-row md:gap-2 md:text-sm',
+                'relative flex flex-1 flex-col items-center gap-0.5 rounded-full px-2 py-2 sm:px-4 text-[11px] font-semibold transition-colors md:flex-none md:flex-row md:gap-2 md:text-sm',
                 tab === id ? 'text-white' : 'text-muted hover:text-white',
               )}
             >

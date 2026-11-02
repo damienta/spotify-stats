@@ -177,11 +177,121 @@ function artist(name: string) {
   }
 }
 
+// Made-up friends (names and listening), kept in memory so adding and removing work until
+// the page reloads.
+const FRIENDS = [
+  { user_id: 'demo-sam', display_name: 'Sam', minutes: 1412, streak: 41, offset: 0, sharing: true },
+  { user_id: 'demo-priya', display_name: 'Priya', minutes: 2210, streak: 9, offset: 3, sharing: true },
+  { user_id: 'demo-alex', display_name: 'Alex', minutes: 0, streak: 0, offset: 6, sharing: false },
+]
+const STRANGER = { user_id: 'demo-jo', display_name: 'Jo', minutes: 655, streak: 3, offset: 8, sharing: true }
+const demoState = { share: true, friends: FRIENDS.map((f) => f.user_id), invite: 'demo-invite' }
+const MY_MINUTES = 1766
+
+const everyone = [...FRIENDS, STRANGER]
+const person = (id: string) => everyone.find((f) => f.user_id === id)
+// Each friend's artists are yours, shifted, plus a few you've never played.
+const theirArtists = (offset: number) =>
+  [...ARTISTS.slice(offset), 'Lumen Tide', 'Coral Static', 'Hollow Pines'].map((name) => ({
+    name,
+    artist_name: null,
+    image: null,
+    url: null,
+  }))
+
+function friends(path: string, method: string, body: { invite?: string }): unknown {
+  const visible = (id: string) => {
+    const f = person(id)
+    if (!f || !demoState.friends.includes(id) || !f.sharing) throw new ApiError(404, 'not found')
+    return f
+  }
+  if (path === '/friends' && method === 'GET') {
+    return {
+      friends: demoState.friends.map((id) => {
+        const f = person(id)!
+        return {
+          user_id: id,
+          display_name: f.display_name,
+          since: '2026-10-20T18:00:00+00:00',
+          sharing: f.sharing,
+          minutes_this_week: f.sharing ? f.minutes : null,
+        }
+      }).sort((a, b) => a.display_name.localeCompare(b.display_name)),
+    }
+  }
+  if (path === '/friends/leaderboard') {
+    const rows = [
+      { user_id: 'demo', display_name: 'Demo listener', minutes: MY_MINUTES, is_you: true },
+      ...demoState.friends
+        .map((id) => person(id)!)
+        .filter((f) => f.sharing)
+        .map((f) => ({ user_id: f.user_id, display_name: f.display_name, minutes: f.minutes, is_you: false })),
+    ].sort((a, b) => b.minutes - a.minutes)
+    return { leaderboard: rows.map((r, i) => ({ rank: i + 1, ...r })) }
+  }
+  if (path === '/friends/invite') return { invite: demoState.invite }
+  if (path === '/friends/invite/reset') {
+    demoState.invite = `demo-invite-${Date.now().toString(36)}`
+    return { invite: demoState.invite }
+  }
+  // In the demo, any link other than your own is from Jo.
+  if (path === '/friends/invite/preview') {
+    return {
+      display_name: body.invite === demoState.invite ? 'Demo listener' : STRANGER.display_name,
+      is_you: body.invite === demoState.invite,
+      already_friends: demoState.friends.includes(STRANGER.user_id),
+    }
+  }
+  if (path === '/friends' && method === 'POST') {
+    if (body.invite === demoState.invite) throw new ApiError(400, "that's your own invite link")
+    if (demoState.friends.includes(STRANGER.user_id)) throw new ApiError(409, "you're already friends")
+    demoState.friends.push(STRANGER.user_id)
+    return { user_id: STRANGER.user_id, display_name: STRANGER.display_name, since: new Date().toISOString() }
+  }
+  const [, , id, part] = path.split('/')
+  if (method === 'DELETE') {
+    if (!demoState.friends.includes(id)) throw new ApiError(404, 'not found')
+    demoState.friends = demoState.friends.filter((f) => f !== id)
+    return undefined
+  }
+  const f = visible(id)
+  const artists = theirArtists(f.offset)
+  if (part === 'summary') {
+    return {
+      user_id: id,
+      display_name: f.display_name,
+      ready: true,
+      top_artists: artists.slice(0, 10),
+      top_tracks: TRACKS.map((name, i) => ({ name, artist_name: artists[i % artists.length].name, image: null, url: null })),
+      minutes_this_week: f.minutes,
+      streak_days: f.streak,
+    }
+  }
+  const mine = ARTISTS.map((name) => name)
+  return {
+    user_id: id,
+    display_name: f.display_name,
+    taste_match: Math.max(8, 74 - f.offset * 9),
+    both_love: artists
+      .map((a, i) => ({ ...a, your_rank: mine.indexOf(a.name) + 1, their_rank: i + 1 }))
+      .filter((a) => a.your_rank > 0)
+      .sort((a, b) => Math.max(a.your_rank, a.their_rank) - Math.max(b.your_rank, b.their_rank) || a.your_rank - b.your_rank)
+      .slice(0, 10),
+    new_to_you: artists.filter((a) => !mine.includes(a.name)),
+  }
+}
+
 /** Answers an API path the way the real API would, after a short pretend network delay. */
-export async function demoApi(path: string): Promise<unknown> {
+export async function demoApi(path: string, send?: { method: string; body?: unknown }): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 250))
   const url = new URL(path, 'http://demo')
-  if (url.pathname === '/me') return { user_id: 'demo', display_name: 'Demo listener' }
+  const method = send?.method ?? 'GET'
+  if (url.pathname === '/me') {
+    const body = send?.body as { share_with_friends?: boolean } | undefined
+    if (method === 'PATCH') demoState.share = body?.share_with_friends ?? demoState.share
+    return { user_id: 'demo', display_name: 'Demo listener', share_with_friends: demoState.share }
+  }
+  if (url.pathname.startsWith('/friends')) return friends(url.pathname, method, (send?.body ?? {}) as { invite?: string })
   if (url.pathname === '/me/now-playing') return { is_playing: true, progress_ms: 61_000, track: track(0) }
   if (url.pathname === '/me/recent') {
     const limit = Number(url.searchParams.get('limit') ?? 20)

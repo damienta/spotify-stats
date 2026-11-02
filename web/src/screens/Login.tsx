@@ -1,4 +1,4 @@
-import { Clock3, Flame, Ticket, Trophy } from 'lucide-react'
+import { Clock3, Flame, Ticket, Trophy, Users } from 'lucide-react'
 
 import Aurora from '@/components/Aurora'
 import BlurText from '@/components/BlurText'
@@ -75,7 +75,7 @@ function Preview() {
   )
 }
 
-export function Login({ error }: { error: string | null }) {
+export function Login({ error, invited = false }: { error: string | null; invited?: boolean }) {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-[60vh] opacity-80">
@@ -89,6 +89,12 @@ export function Login({ error }: { error: string | null }) {
 
       <main className="relative mx-auto grid max-w-5xl items-center gap-12 px-6 py-14 md:grid-cols-[1.1fr_1fr] md:py-20">
         <div className="flex flex-col items-center gap-6 text-center md:items-start md:text-left">
+          {invited && (
+            <p role="status" className="glass rounded-full px-4 py-2 text-sm font-semibold">
+              <Users className="mr-2 inline size-4 text-accent" />
+              A friend invited you. Log in with Spotify to add them.
+            </p>
+          )}
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
             <BlurText
               text="Your listening, in numbers."
