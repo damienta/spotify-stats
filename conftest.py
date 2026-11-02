@@ -35,4 +35,16 @@ def aws(monkeypatch):
             ],
             BillingMode="PAY_PER_REQUEST",
         )
+        dynamodb.create_table(
+            TableName="friends",
+            KeySchema=[
+                {"AttributeName": "user_id", "KeyType": "HASH"},
+                {"AttributeName": "friend_id", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "user_id", "AttributeType": "S"},
+                {"AttributeName": "friend_id", "AttributeType": "S"},
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
         yield

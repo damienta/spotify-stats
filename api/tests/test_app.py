@@ -11,12 +11,14 @@ from stats_api.app import (
     Settings,
     app,
     get_bucket,
+    get_friends,
     get_http,
     get_s3,
     get_settings,
     get_stats_table,
     get_users,
 )
+from stats_api.friends import FriendsTable
 from stats_api.sessions import sign
 from stats_ingest.spotify import SpotifyConfig, Tokens
 from stats_ingest.storage import UsersTable, artist_stat_name, new_user
@@ -67,6 +69,7 @@ def client(aws):
     app.dependency_overrides = {
         get_settings: lambda: SETTINGS,
         get_users: lambda: users,
+        get_friends: lambda: FriendsTable(boto3.resource("dynamodb").Table("friends")),
         get_stats_table: lambda: stats,
         get_http: http,
         get_s3: lambda: boto3.client("s3"),
@@ -107,6 +110,7 @@ def test_login_round_trip_creates_the_user_and_returns_a_session(client):
     assert client.get("/me", headers={"Authorization": f"Bearer {token}"}).json() == {
         "user_id": "u1",
         "display_name": "Damien",
+        "share_with_friends": True,
     }
 
 

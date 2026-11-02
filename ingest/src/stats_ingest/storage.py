@@ -14,6 +14,7 @@ import contextlib
 import hashlib
 import json
 import os
+import secrets
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -86,6 +87,11 @@ class User:
     created_at: str
     # Unix ms of the newest play already stored; the poller asks Spotify for anything after it.
     cursor_ms: int | None = None
+    # Friends: whether friends may see this user's summary, and the secret inside their invite
+    # links (changing it kills every link given out before). Kept here so `put` at login
+    # doesn't wipe them; changed only through the narrow updates below.
+    share_with_friends: bool = True
+    invite_nonce: str | None = None
 
     @property
     def tokens(self) -> Tokens:
@@ -157,6 +163,43 @@ class UsersTable:
 
         return save
 
+    def get_many(self, user_ids: Iterable[str]) -> dict[str, User]:
+        """Users by id, in one BatchGetItem per 100. Ids with no user are left out."""
+        ids = list(dict.fromkeys(user_ids))
+        client, found = self.table.meta.client, {}
+        for start in range(0, len(ids), 100):
+            request = {
+                self.table.name: {"Keys": [{"user_id": i} for i in ids[start : start + 100]]}
+            }
+            while request:
+                response = client.batch_get_item(RequestItems=request)
+                for item in response["Responses"].get(self.table.name, []):
+                    found[item["user_id"]] = _user_from_item(item)
+                request = response.get("UnprocessedKeys") or {}
+        return found
+
+    def set_sharing(self, user_id: str, share: bool) -> None:
+        self.table.update_item(
+            Key={"user_id": user_id},
+            UpdateExpression="SET share_with_friends = :s",
+            ConditionExpression="attribute_exists(user_id)",
+            ExpressionAttributeValues={":s": share},
+        )
+
+    def invite_nonce(self, user_id: str, reset: bool = False) -> str:
+        """The user's invite secret, made on first use. `if_not_exists` keeps two first calls
+        at once from handing out links with different secrets."""
+        fresh = secrets.token_urlsafe(9)
+        value = ":n" if reset else "if_not_exists(invite_nonce, :n)"
+        response = self.table.update_item(
+            Key={"user_id": user_id},
+            UpdateExpression=f"SET invite_nonce = {value}",
+            ConditionExpression="attribute_exists(user_id)",
+            ExpressionAttributeValues={":n": fresh},
+            ReturnValues="ALL_NEW",
+        )
+        return response["Attributes"]["invite_nonce"]
+
     def save_cursor(self, user_id: str, cursor_ms: int) -> None:
         """Move the cursor forward. It never moves back, even when the poller and the API
         store plays at the same time."""
@@ -179,6 +222,8 @@ def _user_from_item(item: dict[str, Any]) -> User:
         expires_at=float(item.get("expires_at", 0)),
         created_at=item.get("created_at", ""),
         cursor_ms=int(item["cursor_ms"]) if item.get("cursor_ms") is not None else None,
+        share_with_friends=bool(item.get("share_with_friends", True)),
+        invite_nonce=item.get("invite_nonce"),
     )
 
 
