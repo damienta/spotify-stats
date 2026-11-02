@@ -102,6 +102,21 @@ few.
 | **Public function URL limited to invocations through the URL** | Nobody can call the Lambda directly from another AWS account |
 | **Now playing cached 5 s per user** | The app polls; this keeps Spotify calls low |
 
+## Friends
+
+| Decision | Why |
+|---|---|
+| **Invite links, no friend requests: having the link is the approval** | No inbox, pending state or notifications to build; the person opening it still confirms with "Add" |
+| **Links are signed tokens (`purpose="invite"`, 14 days) holding a per-user `invite_nonce`** | Nothing to store per link; resetting the nonce kills every link given out before |
+| **One item per direction, written in one `TransactWriteItems` with `attribute_not_exists`** | "My friends" is one Query; a double tap or a race can't make a one-sided friendship |
+| **404, never 403, for strangers, unknown ids and friends who don't share** | Nobody can use the API to learn whether an account exists or who shares (OWASP A01); one `FriendDep` does the check for every route |
+| **Friends see what you play, not how much** (names and pictures of top 10s, minutes this week, streak) | The least that makes the feature fun; never history, recent plays or the listening clock |
+| **Taste match = weighted Jaccard of 12-month top-artist shares** | Proportions, so a heavy and a light listener with the same taste score 100; your number one counts more than your 90th |
+| **Computed per request, not in the stats job** | Three items in one BatchGetItem plus arithmetic; precompute only if it gets slow |
+| **The web app builds the link from its own address** | Works on the real domain, preview deployments and localhost with no API config |
+| **Invite token sent in POST bodies, never in API URLs** | Keeps tokens out of request logs (the Ticketmaster key once leaked through logged URLs) |
+| **Sharing settings live on `User`** | The login callback rewrites the whole user item; fields outside the dataclass would be wiped |
+
 ## Web app
 
 | Decision | Why |
