@@ -3,6 +3,7 @@
 export interface Me {
   user_id: string
   display_name: string
+  share_with_friends: boolean
 }
 
 export interface Track {
@@ -130,4 +131,54 @@ export interface Touring {
   image?: string | null
   url?: string | null
   events: Gig[]
+}
+
+// Friends (api/src/stats_api/app.py, /friends routes).
+
+export interface Friend {
+  user_id: string
+  display_name: string
+  since: string
+  sharing: boolean
+  minutes_this_week: number | null
+}
+
+export interface LeaderRow {
+  rank: number
+  user_id: string
+  display_name: string
+  minutes: number
+  is_you: boolean
+}
+
+export interface InvitePreview {
+  display_name: string
+  is_you: boolean
+  already_friends: boolean
+}
+
+/** A top-list row as a friend sees it: what it is, never how much it was played. */
+export interface PublicRow {
+  name: string
+  artist_name: string | null
+  image: string | null
+  url: string | null
+}
+
+export interface FriendSummary {
+  user_id: string
+  display_name: string
+  ready: boolean
+  top_artists: PublicRow[]
+  top_tracks: PublicRow[]
+  minutes_this_week: number
+  streak_days: number
+}
+
+export interface Compare {
+  user_id: string
+  display_name: string
+  taste_match: number | null
+  both_love: (PublicRow & { your_rank: number; their_rank: number })[]
+  new_to_you: PublicRow[]
 }

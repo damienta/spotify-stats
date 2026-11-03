@@ -1,7 +1,17 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, api, type StatDocument } from './api'
-import type { ArtistPage, Me, NowPlaying, Recent } from './types'
+import type {
+  ArtistPage,
+  Compare,
+  Friend,
+  FriendSummary,
+  InvitePreview,
+  LeaderRow,
+  Me,
+  NowPlaying,
+  Recent,
+} from './types'
 
 // A 4xx won't fix itself on retry (not built yet, reconnect needed); anything else might.
 const retry = (failures: number, error: unknown) =>
@@ -64,5 +74,111 @@ export function useRecent(limit = 10) {
     queryFn: () => api<Recent>(`/me/recent?limit=${limit}`),
     retry,
     refetchInterval: 60_000,
+  })
+}
+
+// Friends. Every friends query shares the 'friends' key, so adding or removing someone
+// refetches them all.
+
+export function useFriends() {
+  return useQuery({
+    queryKey: ['friends', 'list'],
+    queryFn: () => api<{ friends: Friend[] }>('/friends').then((r) => r.friends),
+    retry,
+  })
+}
+
+export function useLeaderboard() {
+  return useQuery({
+    queryKey: ['friends', 'leaderboard'],
+    queryFn: () =>
+      api<{ leaderboard: LeaderRow[] }>('/friends/leaderboard').then((r) => r.leaderboard),
+    retry,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useInvite() {
+  return useQuery({
+    queryKey: ['friends', 'invite'],
+    queryFn: () => api<{ invite: string }>('/friends/invite').then((r) => r.invite),
+    retry,
+    staleTime: Infinity,
+  })
+}
+
+export function useInvitePreview(invite: string | null) {
+  return useQuery({
+    queryKey: ['friends', 'preview', invite],
+    queryFn: () =>
+      api<InvitePreview>('/friends/invite/preview', { method: 'POST', body: { invite } }),
+    enabled: invite !== null,
+    retry,
+  })
+}
+
+// A friend's stats are as fresh as their hourly build, like your own.
+export function useFriendSummary(userId: string) {
+  return useQuery({
+    queryKey: ['friends', 'summary', userId],
+    queryFn: () => api<FriendSummary>(`/friends/${encodeURIComponent(userId)}/summary`),
+    retry,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useCompare(userId: string) {
+  return useQuery({
+    queryKey: ['friends', 'compare', userId],
+    queryFn: () => api<Compare>(`/friends/${encodeURIComponent(userId)}/compare`),
+    retry,
+    staleTime: 5 * 60_000,
+  })
+}
+
+function useFriendsChanged() {
+  const client = useQueryClient()
+  return () => client.invalidateQueries({ queryKey: ['friends'] })
+}
+
+export function useAcceptInvite() {
+  const changed = useFriendsChanged()
+  return useMutation({
+    mutationFn: (invite: string) =>
+      api<{ user_id: string; display_name: string }>('/friends', {
+        method: 'POST',
+        body: { invite },
+      }),
+    onSuccess: changed,
+  })
+}
+
+export function useRemoveFriend() {
+  const changed = useFriendsChanged()
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api<void>(`/friends/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+    onSuccess: changed,
+  })
+}
+
+export function useResetInvite() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api<{ invite: string }>('/friends/invite/reset', { method: 'POST' }),
+    onSuccess: (r) => client.setQueryData(['friends', 'invite'], r.invite),
+  })
+}
+
+export function useSetSharing() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (share: boolean) =>
+      api<Me>('/me', { method: 'PATCH', body: { share_with_friends: share } }),
+    onSuccess: (me) => {
+      client.setQueryData(['me'], me)
+      // You drop off (or back onto) friends' boards; your own board shows you either way.
+      client.invalidateQueries({ queryKey: ['friends'] })
+    },
   })
 }

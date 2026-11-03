@@ -67,10 +67,20 @@ export async function deleteAccount() {
   logout()
 }
 
-export async function api<T>(path: string): Promise<T> {
-  if (demo) return demoApi(path) as Promise<T>
+export interface Send {
+  method: 'POST' | 'PATCH' | 'DELETE'
+  body?: unknown
+}
+
+export async function api<T>(path: string, send?: Send): Promise<T> {
+  if (demo) return demoApi(path, send) as Promise<T>
   const response = await fetch(`/api${path}`, {
-    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    method: send?.method ?? 'GET',
+    headers: {
+      Authorization: `Bearer ${getToken() ?? ''}`,
+      ...(send?.body !== undefined && { 'Content-Type': 'application/json' }),
+    },
+    body: send?.body !== undefined ? JSON.stringify(send.body) : undefined,
   })
   if (response.status === 401) {
     logout()
@@ -79,7 +89,8 @@ export async function api<T>(path: string): Promise<T> {
     const body = await response.json().catch(() => ({}))
     throw new ApiError(response.status, body.detail ?? response.statusText)
   }
-  return response.json() as Promise<T>
+  // 204 No Content (removing a friend) has no body to read.
+  return (response.status === 204 ? undefined : response.json()) as Promise<T>
 }
 
 export interface StatDocument<T> {

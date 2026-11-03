@@ -6,6 +6,7 @@ import { Nav, type Tab } from './components/Nav'
 import { Skeleton } from './components/States'
 import { finishLogin, getToken } from './lib/api'
 import { OpenArtist, artistInPath, artistPath } from './lib/artist'
+import { OpenFriend, forgetInvite, friendInPath, friendPath, startInvite } from './lib/friends'
 import { useSettings } from './lib/settings'
 
 // Each screen is its own download, so the first visit only loads what it shows: the login
@@ -21,15 +22,22 @@ const Settings = lazy(() =>
 const Top = lazy(() => import('./screens/Top').then((m) => ({ default: m.Top })))
 const Gigs = lazy(() => import('./screens/Gigs').then((m) => ({ default: m.Gigs })))
 const Artist = lazy(() => import('./screens/Artist').then((m) => ({ default: m.Artist })))
+const Friends = lazy(() => import('./screens/Friends').then((m) => ({ default: m.Friends })))
+const Friend = lazy(() => import('./screens/Friend').then((m) => ({ default: m.Friend })))
+const AddFriend = lazy(() =>
+  import('./screens/AddFriend').then((m) => ({ default: m.AddFriend })),
+)
 
 const TAB_KEY = 'spotify-stats.tab'
 // Runs once, before the first render: picks up ?token= after "Log in with Spotify".
 const loginError = finishLogin()
+// Then an invite from /add/<invite>, or one saved before going to log in.
+const pendingInvite = startInvite()
 
 function savedTab(): Tab {
   try {
     const tab = localStorage.getItem(TAB_KEY)
-    return tab === 'top' || tab === 'stats' || tab === 'gigs' || tab === 'settings' ? tab : 'home'
+    return ['top', 'stats', 'gigs', 'friends', 'settings'].includes(tab ?? '') ? (tab as Tab) : 'home'
   } catch {
     return 'home'
   }
@@ -50,9 +58,15 @@ export function App() {
   const settings = useSettings()
   // An artist's page sits over the tabs at /artist/<name>, so the browser's back button works.
   const [artist, setArtist] = useState<string | null>(() => artistInPath())
+  // A friend's page works the same way at /friend/<id>; an artist page can open over it.
+  const [friend, setFriend] = useState<string | null>(() => friendInPath())
+  const [invite, setInvite] = useState<string | null>(pendingInvite)
 
   useEffect(() => {
-    const onPop = () => setArtist(artistInPath())
+    const onPop = () => {
+      setArtist(artistInPath())
+      setFriend(friendInPath())
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
@@ -60,6 +74,12 @@ export function App() {
   const openArtist = useCallback((name: string) => {
     window.history.pushState({ artist: name }, '', artistPath(name))
     setArtist(name)
+    window.scrollTo({ top: 0 })
+  }, [])
+
+  const openFriend = useCallback((userId: string) => {
+    window.history.pushState({ friend: userId }, '', friendPath(userId))
+    setFriend(userId)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -72,7 +92,7 @@ export function App() {
   if (!getToken()) {
     return (
       <Suspense fallback={null}>
-        <Login error={loginError} />
+        <Login error={loginError} invited={invite !== null} />
       </Suspense>
     )
   }
@@ -86,10 +106,19 @@ export function App() {
     }
   }
 
+  const closeFriend = () => {
+    if (window.history.state?.friend) window.history.back()
+    else {
+      window.history.replaceState(null, '', '/')
+      setFriend(null)
+    }
+  }
+
   const go = (next: Tab) => {
-    if (artist) {
+    if (artist || friend) {
       window.history.pushState(null, '', '/')
       setArtist(null)
+      setFriend(null)
     }
     setTab(next)
     window.scrollTo({ top: 0 })
@@ -100,15 +129,27 @@ export function App() {
     }
   }
 
-  const view = artist ? `artist:${artist}` : tab
-  const screen = artist ? (
+  // Done with an invite, added or not: forget it so it doesn't come back on the next load.
+  const finishInvite = () => {
+    forgetInvite()
+    setInvite(null)
+    go('friends')
+  }
+
+  const view = invite ? 'invite' : artist ? `artist:${artist}` : friend ? `friend:${friend}` : tab
+  const screen = invite ? (
+    <AddFriend invite={invite} onDone={finishInvite} />
+  ) : artist ? (
     <Artist name={artist} onBack={closeArtist} />
+  ) : friend ? (
+    <Friend userId={friend} onBack={closeFriend} />
   ) : (
     <>
       {tab === 'home' && <Home onSeeAll={() => go('top')} onGigs={() => go('gigs')} />}
       {tab === 'top' && <Top />}
       {tab === 'stats' && <Stats />}
       {tab === 'gigs' && <Gigs />}
+      {tab === 'friends' && <Friends />}
       {tab === 'settings' && <Settings />}
     </>
   )
@@ -140,7 +181,9 @@ export function App() {
                 transition={{ duration: 0.2 }}
               >
                 <ErrorBoundary key={view}>
-                  <Suspense fallback={<Loading />}>{screen}</Suspense>
+                  <Suspense fallback={<Loading />}>
+                    <OpenFriend.Provider value={openFriend}>{screen}</OpenFriend.Provider>
+                  </Suspense>
                 </ErrorBoundary>
               </motion.div>
             </AnimatePresence>

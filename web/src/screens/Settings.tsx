@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, LogOut, Trash2 } from 'lucide-react'
+import { ChevronDown, ExternalLink, LogOut, RotateCcw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Section } from '@/components/Section'
@@ -6,7 +6,7 @@ import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Button } from '@/components/ui/button'
 import { deleteAccount, logout } from '@/lib/api'
-import { useMe } from '@/lib/queries'
+import { useMe, useResetInvite, useSetSharing } from '@/lib/queries'
 import {
   CITIES,
   type MotionSetting,
@@ -55,8 +55,9 @@ function DeleteAccount() {
     <div role="alert" className="space-y-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-4">
       <p className="font-semibold">Delete everything?</p>
       <p className="text-sm text-muted">
-        This removes your account, every play we've stored and all your stats. It can't be
-        undone. You can log in again later, but your history starts from scratch.
+        This removes your account, every play we've stored, all your stats and your
+        friendships. It can't be undone. You can log in again later, but your history starts
+        from scratch.
       </p>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex flex-wrap gap-2">
@@ -68,6 +69,51 @@ function DeleteAccount() {
         </Button>
       </div>
     </div>
+  )
+}
+
+function ResetInvite() {
+  const reset = useResetInvite()
+  if (reset.isSuccess) return <p className="text-sm font-semibold text-accent">New link made</p>
+  return (
+    <Button variant="glass" onClick={() => reset.mutate()} disabled={reset.isPending}>
+      <RotateCcw className="size-4" />
+      {reset.isPending ? 'Resetting…' : 'Reset my link'}
+    </Button>
+  )
+}
+
+function Friends() {
+  const me = useMe()
+  const sharing = useSetSharing()
+  // Show the change straight away; it goes back if saving fails.
+  const share = sharing.isPending ? sharing.variables : (me.data?.share_with_friends ?? true)
+  return (
+    <Section title="Friends">
+      <SpotlightCard className="space-y-5 p-5">
+        <Row
+          label="Share my summary with friends"
+          hint={
+            sharing.isError
+              ? "That didn't save. Try again."
+              : 'Your top 10s, minutes this week and streak. Off hides you from friends and their leaderboards.'
+          }
+        >
+          <Segmented<'on' | 'off'>
+            className="sm:w-80"
+            value={share ? 'on' : 'off'}
+            onChange={(v) => sharing.mutate(v === 'on')}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+        </Row>
+        <Row label="Invite link" hint="Makes a new link. Links you've already sent stop working.">
+          <ResetInvite />
+        </Row>
+      </SpotlightCard>
+    </Section>
   )
 }
 
@@ -105,6 +151,8 @@ export function Settings() {
           </Row>
         </SpotlightCard>
       </Section>
+
+      <Friends />
 
       <Section title="Concerts">
         <SpotlightCard className="p-5">
