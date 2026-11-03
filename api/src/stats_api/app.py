@@ -18,6 +18,9 @@ POST /friends/invite/reset               a new token; every old link stops worki
 POST /friends/invite/preview {invite}    who a link is from, so the app can ask "Add Alice?"
 POST /friends {invite}                   accept a link: friends both ways
 DELETE /friends/{id}                     remove a friend, both ways
+GET /friends/{id}/summary                a friend's top 10s, minutes this week, streak
+GET /friends/{id}/compare                taste match %, artists you both love, theirs new to you
+GET /friends/leaderboard                 me and my friends by minutes this week
 """
 
 from __future__ import annotations
@@ -45,9 +48,14 @@ from pydantic import BaseModel, Field
 from stats_api.friends import (
     INVITE_TTL_S,
     MAX_FRIENDS,
+    SHOWN,
     AlreadyFriends,
     FriendsTable,
     NotFriends,
+    both_love,
+    new_to_you,
+    public_row,
+    taste_match,
 )
 from stats_api.sessions import SESSION_TTL_S, STATE_TTL_S, InvalidToken, sign, verify
 from stats_ingest.poller import store_plays
@@ -575,6 +583,84 @@ def _stat_docs(stats: Any, keys: list[tuple[str, str]]) -> dict[tuple[str, str],
                 found[(item["user_id"], item["stat_name"])] = json.loads(item["data"])
             request = response.get("UnprocessedKeys") or {}
     return found
+
+
+def friend(user_id: UserIdDep, users: UsersDep, friends: FriendsDep, friend_id: str) -> User:
+    """The friend a `/friends/{id}/...` route is about. Every such route depends on this, so
+    the check can't be forgotten on one of them.
+
+    Not friends, no such user, and a friend who has turned sharing off all give the same 404
+    (not 403), so nobody can learn whether an account exists or who shares."""
+    if friend_id == user_id or friends.get(user_id, friend_id) is None:
+        raise HTTPException(404, "not found")
+    them = users.get(friend_id)
+    if them is None or not them.share_with_friends:
+        raise HTTPException(404, "not found")
+    return them
+
+
+FriendDep = Annotated[User, Depends(friend)]
+
+
+@app.get("/friends/leaderboard")
+def leaderboard(
+    user_id: UserIdDep, users: UsersDep, stats: StatsDep, friends: FriendsDep
+) -> dict[str, Any]:
+    """Me and my friends who share, by minutes this week. I'm always on my own board."""
+    people = users.get_many([user_id, *(f.friend_id for f in friends.of(user_id))])
+    board = [i for i, p in people.items() if i == user_id or p.share_with_friends]
+    minutes = _minutes_this_week(stats, board)
+    rows = sorted(
+        (
+            {
+                "user_id": i,
+                "display_name": people[i].display_name,
+                "minutes": minutes[i],
+                "is_you": i == user_id,
+            }
+            for i in board
+        ),
+        key=lambda r: (-r["minutes"], r["display_name"].casefold()),
+    )
+    return {"leaderboard": [{"rank": n, **r} for n, r in enumerate(rows, 1)]}
+
+
+@app.get("/friends/{friend_id}/summary")
+def friend_summary(them: FriendDep, stats: StatsDep) -> dict[str, Any]:
+    """Only these fields, never their full history, recent plays or listening clock. A friend
+    whose stats aren't built yet gets empty lists and `generated_at: null`."""
+    names = ["top_artists#4_weeks", "top_tracks#4_weeks", "totals#this_week", "streaks"]
+    docs = _stat_docs(stats, [(them.user_id, n) for n in names])
+    doc = {n: docs.get((them.user_id, n)) for n in names}
+    return {
+        "user_id": them.user_id,
+        "display_name": them.display_name,
+        "ready": doc["totals#this_week"] is not None,
+        "top_artists": [public_row(r) for r in (doc["top_artists#4_weeks"] or [])[:SHOWN]],
+        "top_tracks": [public_row(r) for r in (doc["top_tracks#4_weeks"] or [])[:SHOWN]],
+        "minutes_this_week": round((doc["totals#this_week"] or {}).get("hours", 0) * 60),
+        "streak_days": ((doc["streaks"] or {}).get("current") or {}).get("days", 0),
+    }
+
+
+@app.get("/friends/{friend_id}/compare")
+def friend_compare(user_id: UserIdDep, them: FriendDep, stats: StatsDep) -> dict[str, Any]:
+    """Compared on each person's top 100 artists of the last 12 months. "New to you" also
+    skips anything in your all-time list, so it's artists you really haven't been playing."""
+    keys = [
+        (user_id, "top_artists#12_months"),
+        (user_id, "top_artists#all_time"),
+        (them.user_id, "top_artists#12_months"),
+    ]
+    docs = _stat_docs(stats, keys)
+    mine, mine_ever, theirs = (docs.get(k) or [] for k in keys)
+    return {
+        "user_id": them.user_id,
+        "display_name": them.display_name,
+        "taste_match": taste_match(mine, theirs),
+        "both_love": both_love(mine, theirs),
+        "new_to_you": new_to_you(theirs, mine + mine_ever),
+    }
 
 
 handler = Mangum(app, lifespan="off")

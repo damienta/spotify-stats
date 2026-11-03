@@ -232,3 +232,153 @@ def test_friends_routes_need_a_session(client):
     assert client.get("/friends").status_code == 401
     assert client.get("/friends/invite").status_code == 401
     assert client.post("/friends", json={"invite": "x"}).status_code == 401
+
+
+# Seeing a friend.
+
+
+def artist(name, hours, image=None):
+    return {
+        "name": name,
+        "artist_name": None,
+        "streams": 9,
+        "hours": hours,
+        "image": image,
+        "url": None,
+    }
+
+
+def share_some_stats(user_id):
+    put_stat(user_id, "top_artists#4_weeks", [artist(f"A{n}", 20 - n) for n in range(15)])
+    put_stat(
+        user_id, "top_tracks#4_weeks", [{**artist(f"T{n}", 5), "track_id": "x"} for n in range(15)]
+    )
+    put_stat(user_id, "totals#this_week", {"streams": 300, "hours": 4.25, "artists": 9})
+    put_stat(user_id, "streaks", {"current": {"days": 12}, "longest": {"days": 99}})
+    put_stat(user_id, "listening_clock#4_weeks", [{"weekday": 1, "hour": 3, "minutes": 9}])
+
+
+FRIEND_ROUTES = ("/friends/{}/summary", "/friends/{}/compare")
+
+
+@pytest.mark.parametrize("route", FRIEND_ROUTES)
+def test_strangers_and_unknown_ids_are_not_found_alike(client, route):
+    share_some_stats("carol")
+
+    stranger = client.get(route.format("carol"), headers=auth("alice"))
+    nobody = client.get(route.format("no-such-user"), headers=auth("alice"))
+    yourself = client.get(route.format("alice"), headers=auth("alice"))
+
+    assert stranger.status_code == nobody.status_code == yourself.status_code == 404
+    assert stranger.json() == nobody.json()
+
+
+@pytest.mark.parametrize("route", FRIEND_ROUTES)
+def test_a_friend_who_stops_sharing_is_not_found(client, route):
+    befriend(client, "alice", "bob")
+    share_some_stats("bob")
+    client.patch("/me", json={"share_with_friends": False}, headers=auth("bob"))
+
+    assert client.get(route.format("bob"), headers=auth("alice")).status_code == 404
+
+
+def test_a_removed_friend_is_not_found(client):
+    befriend(client, "alice", "bob")
+    share_some_stats("bob")
+    client.delete("/friends/bob", headers=auth("alice"))
+
+    assert client.get("/friends/bob/summary", headers=auth("alice")).status_code == 404
+
+
+def test_summary_has_only_the_agreed_fields(client):
+    befriend(client, "alice", "bob")
+    share_some_stats("bob")
+
+    body = client.get("/friends/bob/summary", headers=auth("alice")).json()
+
+    assert set(body) == {
+        "user_id",
+        "display_name",
+        "ready",
+        "top_artists",
+        "top_tracks",
+        "minutes_this_week",
+        "streak_days",
+    }
+    assert len(body["top_artists"]) == len(body["top_tracks"]) == 10
+    # What each row is, never how much they played it.
+    assert set(body["top_artists"][0]) == {"name", "artist_name", "image", "url"}
+    assert (body["ready"], body["minutes_this_week"], body["streak_days"]) == (True, 255, 12)
+
+
+def test_summary_before_their_stats_are_built(client):
+    befriend(client, "alice", "bob")
+
+    body = client.get("/friends/bob/summary", headers=auth("alice")).json()
+
+    assert body["ready"] is False
+    assert (body["top_artists"], body["minutes_this_week"], body["streak_days"]) == ([], 0, 0)
+
+
+def test_compare(client):
+    befriend(client, "alice", "bob")
+    put_stat(
+        "alice", "top_artists#12_months", [artist("Nova", 10), artist("Kites", 5), artist("Old", 1)]
+    )
+    put_stat("alice", "top_artists#all_time", [artist("Forgotten", 50)])
+    put_stat(
+        "bob",
+        "top_artists#12_months",
+        [
+            artist("kites ", 8, image="k.jpg"),
+            artist("Nova", 2),
+            artist("Forgotten", 1),
+            artist("Fresh", 1),
+        ],
+    )
+
+    body = client.get("/friends/bob/compare", headers=auth("alice")).json()
+
+    assert 0 < body["taste_match"] < 100
+    # Nova (your 1st, their 2nd) and Kites (your 2nd, their 1st) tie on worst rank; your
+    # favourite goes first. "kites " matches "Kites": case and spacing don't count.
+    assert [(a["your_rank"], a["their_rank"]) for a in body["both_love"]] == [(1, 2), (2, 1)]
+    assert body["both_love"][1]["image"] == "k.jpg"
+    # Forgotten is in your all-time list, so it isn't new to you.
+    assert [a["name"] for a in body["new_to_you"]] == ["Fresh"]
+
+
+def test_compare_before_stats_exist(client):
+    befriend(client, "alice", "bob")
+
+    body = client.get("/friends/bob/compare", headers=auth("alice")).json()
+
+    assert body == {
+        "user_id": "bob",
+        "display_name": "Bob",
+        "taste_match": None,
+        "both_love": [],
+        "new_to_you": [],
+    }
+
+
+def test_leaderboard_ranks_me_and_sharing_friends(client):
+    befriend(client, "alice", "bob")
+    befriend(client, "alice", "carol")
+    put_stat("alice", "totals#this_week", {"hours": 1})
+    put_stat("bob", "totals#this_week", {"hours": 3})
+    put_stat("carol", "totals#this_week", {"hours": 9})
+    client.patch("/me", json={"share_with_friends": False}, headers=auth("carol"))
+
+    board = client.get("/friends/leaderboard", headers=auth("alice")).json()["leaderboard"]
+
+    assert board == [
+        {"rank": 1, "user_id": "bob", "display_name": "Bob", "minutes": 180, "is_you": False},
+        {"rank": 2, "user_id": "alice", "display_name": "Alice", "minutes": 60, "is_you": True},
+    ]
+
+
+def test_leaderboard_with_no_friends_is_just_you(client):
+    board = client.get("/friends/leaderboard", headers=auth("alice")).json()["leaderboard"]
+
+    assert [(r["user_id"], r["minutes"]) for r in board] == [("alice", 0)]
