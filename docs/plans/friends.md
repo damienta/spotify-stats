@@ -4,6 +4,21 @@ How to add friends to Stats: connect by invite link, see a friend's summary, com
 and a weekly minutes leaderboard. Written 31 October 2026, before any of it is built. Read
 [../HANDOFF.md](../HANDOFF.md) first for how the project runs.
 
+**Status, 2 November 2026:** built in #46 (infra), #47 and #48 (API), #49 (web) and #50
+(docs). Where the build differs from this plan:
+
+- `GET /friends/invite` returns only the token; the web app builds the link from its own
+  address, so previews and localhost work without config.
+- The preview is `POST /friends/invite/preview {invite}`, not `GET /friends/invite/{invite}`,
+  so tokens never sit in URLs or logs. It needs a login, so a logged-out visitor sees "A friend
+  invited you" without the name.
+- Artists are matched on the case-folded name only: top lists don't reliably carry Spotify
+  artist ids.
+- "You both love" orders by the worse of the two ranks, ties to your own favourite. "Theirs,
+  new to you" also skips your all-time artists, not only your 12-month list.
+- Summary rows carry only name, artist, picture and link: no streams or hours.
+- The leaderboard needs `BatchGetItem` on the users table too, added in #46.
+
 ## What it does
 
 1. **Invite.** In the Friends tab you copy (or share) your invite link,

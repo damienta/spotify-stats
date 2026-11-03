@@ -60,7 +60,7 @@ of the write path without touching the app.
 | **Poller Lambda** | `ingest/…/poller.py` | Every 20 min (EventBridge) | For each user: refresh their token, fetch plays newer than their cursor, store raw JSON and listens in S3, move the cursor |
 | **Stats Lambda** | `jobs/…/job.py` | Hourly (EventBridge) | For each user with new plays: download their files, load them into DuckDB, run the stat queries for every window, add pictures, write the documents to DynamoDB, merge small poll files |
 | Catalogue | `jobs/…/catalog.py` | Inside the stats Lambda | Looks each top track and artist up in Spotify once, ever, and caches pictures and links in S3 |
-| **API Lambda** | `api/…/app.py` | On request (function URL) | Spotify login, session tokens, serves stat documents, live now playing and recently played |
+| **API Lambda** | `api/…/app.py`, `friends.py` | On request (function URL) | Spotify login, session tokens, serves stat documents, live now playing and recently played, friends |
 | Web app | `web/` | On your PC (`npm run dev`) | React screens: Home, Top, Stats; talks to the API through a local proxy |
 | Infra | `infra/bootstrap`, `infra/live` | `terraform apply` from your PC | Everything in AWS, as code |
 
@@ -85,8 +85,9 @@ the plays are read, using `listen_id` (ADR 0003).
 
 | Table | Key | Holds |
 |---|---|---|
-| `spotify-stats-users` | `user_id` | Display name, Spotify access and refresh tokens, `cursor_ms` (newest stored play) |
+| `spotify-stats-users` | `user_id` | Display name, Spotify access and refresh tokens, `cursor_ms` (newest stored play), `share_with_friends`, `invite_nonce` |
 | `spotify-stats-stats` | `user_id` + `stat_name` | One finished answer per item, such as `top_artists#4_weeks`, as JSON |
+| `spotify-stats-friends` | `user_id` + `friend_id` | One item per direction of a friendship (`since`); both written and deleted in one transaction |
 
 ### SSM Parameter Store
 
@@ -146,13 +147,25 @@ Spotify live.
 | `GET /health` | Liveness check |
 | `GET /auth/login?redirect_uri=` | Starts Spotify login; only app addresses are allowed (`exp://`, `spotifystats://`, localhost) |
 | `GET /auth/callback` | Spotify returns here; saves tokens, sends the browser back with a 30-day session token |
-| `GET /me` | Who you are |
+| `GET /me` | Who you are, and `share_with_friends` |
+| `PATCH /me` | Change `share_with_friends` |
 | `GET /me/overview?window=` | Totals and top 5s in one call |
 | `GET /me/stats/{stat}?window=` | One stat document |
 | `GET /me/now-playing` | Live from Spotify, cached 5 s per user |
 | `GET /me/recent?limit=` | Live from Spotify; stores plays the poller hasn't yet |
 | `GET /me/stats/concerts` | Your top artists with UK dates (built hourly from Ticketmaster) |
-| `DELETE /me` | Deletes the account: user record, every stat document, every S3 file of plays |
+| `DELETE /me` | Deletes the account: user record, every friendship (both ways), every stat document, every S3 file of plays |
+| `GET /friends` | Your friends; minutes this week only for those who share |
+| `GET /friends/invite`, `POST /friends/invite/reset` | Your signed invite token (14 days); reset kills every old link |
+| `POST /friends/invite/preview` | Who a link is from, so the app can ask "Add Alice?" |
+| `POST /friends` | Accept a link: friends both ways (400 own link, 404 dead link, 409 already, 422 over 50) |
+| `DELETE /friends/{id}` | Remove a friend, both ways |
+| `GET /friends/{id}/summary` | Their top 10s (what, not how much), minutes this week, streak |
+| `GET /friends/{id}/compare` | Taste match %, artists you both love, theirs new to you |
+| `GET /friends/leaderboard` | You and friends who share, by minutes this week |
+
+Every `/friends/{id}/...` route goes through one dependency, `friend`: unless you're friends
+and they share, the answer is the same 404 as for an id that doesn't exist.
 
 Session tokens are HMAC-signed by the API (`sessions.py`), so no session table is needed.
 

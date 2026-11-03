@@ -61,6 +61,10 @@ Stage 1, the working app, is live for one user (you, Spotify display name "neima
 | #42 | Hosting prep: login and privacy pages, Pages Function proxy, `APP_HOSTS` login redirects |
 | #43 | Gigs tab (date list, city/All UK/On sale filters) and Home teaser; login footer, top 5 preview, Terms page |
 | #45 | Artist pages (`/artist/<name>`, `GET /me/artist`), gigs line moved down Home and UK-wide |
+| #46 | Friends infra: `spotify-stats-friends` table, API IAM, `FRIENDS_TABLE` |
+| #47 | Friends API, connecting: invite links, accept, list, remove, sharing setting, `DELETE /me` cleanup |
+| #48 | Friends API, seeing: `FriendDep` (404 not 403), summary, compare (taste match), leaderboard |
+| #49 | Friends web: Friends tab, friend page, `/add/<invite>`, Settings switches, Privacy, demo friends |
 | #4, #15 | Leftover test PRs, still open; safe to close |
 
 ## How to run things
@@ -103,7 +107,11 @@ sees them.
    output `dist`, `NODE_VERSION=22`) and sends the `*.pages.dev` address. Then put it in
    `infra/live/terraform.tfvars` as `app_hosts = ["<address>"]` (git-ignored), plan, and apply on
    his word. Spotify's redirect URI doesn't change: Spotify still returns to the Lambda.
-2. **Friends.** Follow [plans/friends.md](plans/friends.md): five PRs, infra first.
+2. **Friends.** Built in #46–#50 following [plans/friends.md](plans/friends.md). To ship:
+   apply #46 (Terraform), then deploy the API (#47 + #48) and the web app (#49) together,
+   because the Privacy page changes with them. Real test: add a second Spotify account in
+   the dashboard's Users Management, log in with it, let the poller run for a day, then send
+   an invite between the two.
 3. **Track pages.** Artist pages are done (#45): `stats_jobs/artists.py` precomputes one item
    per top-50 artist of each range (`artist#<hash>`, see `artist_stat_name`), `GET /me/artist`
    reads it, `web/src/screens/Artist.tsx` shows it. Track pages would follow the same pattern
