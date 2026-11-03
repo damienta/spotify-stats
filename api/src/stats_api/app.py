@@ -2,7 +2,8 @@
 
 GET /auth/login?redirect_uri=<app URL>   start "Log in with Spotify"
 GET /auth/callback                       Spotify returns here; redirects to the app with ?token=
-GET /me                                  who the token belongs to
+GET /me                                  who the token belongs to, and their settings
+PATCH /me {share_with_friends}           change a setting
 GET /me/overview?window=4_weeks          totals and top 5s for the home screen, in one call
 GET /me/stats                            the stat names available
 GET /me/stats/{stat}?window=4_weeks      one stat document, e.g. top_tracks, habits, wrapped
@@ -10,6 +11,13 @@ GET /me/artist?name=<artist>             one of your top artists' pages
 GET /me/now-playing                      the track playing right now, live from Spotify
 GET /me/recent?limit=20                  recently played tracks, live from Spotify
 DELETE /me                               delete the account and every play and stat stored
+
+GET /friends                             my friends
+GET /friends/invite                      my invite token (the app makes it into a link)
+POST /friends/invite/reset               a new token; every old link stops working
+POST /friends/invite/preview {invite}    who a link is from, so the app can ask "Add Alice?"
+POST /friends {invite}                   accept a link: friends both ways
+DELETE /friends/{id}                     remove a friend, both ways
 """
 
 from __future__ import annotations
@@ -32,7 +40,15 @@ import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from mangum import Mangum
+from pydantic import BaseModel, Field
 
+from stats_api.friends import (
+    INVITE_TTL_S,
+    MAX_FRIENDS,
+    AlreadyFriends,
+    FriendsTable,
+    NotFriends,
+)
 from stats_api.sessions import SESSION_TTL_S, STATE_TTL_S, InvalidToken, sign, verify
 from stats_ingest.poller import store_plays
 from stats_ingest.spotify import (
@@ -101,6 +117,11 @@ def get_stats_table() -> Any:
 
 
 @lru_cache
+def get_friends() -> FriendsTable:
+    return FriendsTable(boto3.resource("dynamodb").Table(env("FRIENDS_TABLE")))
+
+
+@lru_cache
 def get_s3() -> Any:
     return boto3.client("s3")
 
@@ -117,6 +138,7 @@ def get_http() -> Iterator[httpx.Client]:
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 UsersDep = Annotated[UsersTable, Depends(get_users)]
 StatsDep = Annotated[Any, Depends(get_stats_table)]
+FriendsDep = Annotated[FriendsTable, Depends(get_friends)]
 HttpDep = Annotated[httpx.Client, Depends(get_http)]
 S3Dep = Annotated[Any, Depends(get_s3)]
 BucketDep = Annotated[str, Depends(get_bucket)]
@@ -214,7 +236,25 @@ def me(user_id: UserIdDep, users: UsersDep) -> dict[str, Any]:
     user = users.get(user_id)
     if user is None:
         raise HTTPException(404, "user not found")
-    return {"user_id": user.user_id, "display_name": user.display_name}
+    return {
+        "user_id": user.user_id,
+        "display_name": user.display_name,
+        "share_with_friends": user.share_with_friends,
+    }
+
+
+class MeChanges(BaseModel):
+    share_with_friends: bool | None = None
+
+
+@app.patch("/me")
+def update_me(user_id: UserIdDep, users: UsersDep, changes: MeChanges) -> dict[str, Any]:
+    if changes.share_with_friends is not None:
+        try:
+            users.set_sharing(user_id, changes.share_with_friends)
+        except users.table.meta.client.exceptions.ConditionalCheckFailedException:
+            raise HTTPException(404, "user not found") from None
+    return me(user_id, users)
 
 
 def _check_window(window: str | None) -> None:
@@ -378,13 +418,19 @@ def recent(
 
 @app.delete("/me", status_code=204)
 def delete_me(
-    user_id: UserIdDep, users: UsersDep, stats: StatsDep, s3: S3Dep, bucket: BucketDep
+    user_id: UserIdDep,
+    users: UsersDep,
+    stats: StatsDep,
+    friends: FriendsDep,
+    s3: S3Dep,
+    bucket: BucketDep,
 ) -> None:
     """Delete the account. The user record goes first, so the poller and the stats job stop
-    picking this user up; then their stat documents; then every file of plays in S3. The
-    shared picture cache holds no personal data, so it stays."""
+    picking this user up; then their friendships, both ways; then their stat documents; then
+    every file of plays in S3. The shared picture cache holds no personal data, so it stays."""
     users.delete(user_id)
     _now_playing_cache.pop(user_id, None)
+    friendships = friends.remove_all(user_id)
     stat_names, kwargs = [], {}
     while True:
         page = stats.query(
@@ -401,7 +447,134 @@ def delete_me(
         for name in stat_names:
             batch.delete_item(Key={"user_id": user_id, "stat_name": name})
     files = sum(delete_prefix(s3, bucket, prefix) for prefix in user_prefixes(user_id))
-    log.info("deleted user %s: %d stats, %d files", user_id, len(stat_names), files)
+    log.info(
+        "deleted user %s: %d friendships, %d stats, %d files",
+        user_id,
+        friendships,
+        len(stat_names),
+        files,
+    )
+
+
+# Friends. Who "I" am always comes from the session token, never from the request body.
+
+
+class Invite(BaseModel):
+    # Tokens are a couple of hundred characters; the cap stops anyone posting megabytes.
+    invite: str = Field(min_length=1, max_length=1000)
+
+
+def _invite_token(settings: Settings, user_id: str, nonce: str) -> dict[str, str]:
+    token = sign(settings.session_secret, {"sub": user_id, "n": nonce}, "invite", INVITE_TTL_S)
+    return {"invite": token}
+
+
+def _inviter(settings: Settings, users: UsersTable, invite: str) -> User:
+    """Who sent a link. Forged, expired and reset links, and links from deleted accounts, all
+    give the same 404, so a link reveals nothing unless it's live."""
+    try:
+        claims = verify(settings.session_secret, invite, "invite")
+    except InvalidToken:
+        raise HTTPException(404, "this invite link isn't valid any more") from None
+    inviter = users.get(str(claims.get("sub", "")))
+    if inviter is None or not inviter.invite_nonce or claims.get("n") != inviter.invite_nonce:
+        raise HTTPException(404, "this invite link isn't valid any more")
+    return inviter
+
+
+@app.get("/friends/invite")
+def get_invite(user_id: UserIdDep, settings: SettingsDep, users: UsersDep) -> dict[str, str]:
+    return _invite_token(settings, user_id, users.invite_nonce(user_id))
+
+
+@app.post("/friends/invite/reset")
+def reset_invite(user_id: UserIdDep, settings: SettingsDep, users: UsersDep) -> dict[str, str]:
+    return _invite_token(settings, user_id, users.invite_nonce(user_id, reset=True))
+
+
+# POST rather than GET /friends/invite/{invite}: the token stays out of URLs, and so out of
+# any request logs (the Ticketmaster key once leaked through logged URLs).
+@app.post("/friends/invite/preview")
+def preview_invite(
+    user_id: UserIdDep, settings: SettingsDep, users: UsersDep, friends: FriendsDep, body: Invite
+) -> dict[str, Any]:
+    inviter = _inviter(settings, users, body.invite)
+    return {
+        "display_name": inviter.display_name,
+        "is_you": inviter.user_id == user_id,
+        "already_friends": friends.get(user_id, inviter.user_id) is not None,
+    }
+
+
+@app.post("/friends", status_code=201)
+def accept_invite(
+    user_id: UserIdDep, settings: SettingsDep, users: UsersDep, friends: FriendsDep, body: Invite
+) -> dict[str, Any]:
+    inviter = _inviter(settings, users, body.invite)
+    if inviter.user_id == user_id:
+        raise HTTPException(400, "that's your own invite link")
+    if friends.get(user_id, inviter.user_id) is not None:
+        raise HTTPException(409, "you're already friends")
+    if max(friends.count(user_id), friends.count(inviter.user_id)) >= MAX_FRIENDS:
+        raise HTTPException(422, f"friends are limited to {MAX_FRIENDS} each")
+    try:
+        since = friends.add(user_id, inviter.user_id)
+    except AlreadyFriends:
+        raise HTTPException(409, "you're already friends") from None
+    return {"user_id": inviter.user_id, "display_name": inviter.display_name, "since": since}
+
+
+@app.get("/friends")
+def list_friends(
+    user_id: UserIdDep, users: UsersDep, stats: StatsDep, friends: FriendsDep
+) -> dict[str, Any]:
+    """My friends, by name. Minutes this week only for friends who share."""
+    friendships = friends.of(user_id)
+    people = users.get_many(f.friend_id for f in friendships)
+    minutes = _minutes_this_week(stats, [i for i, p in people.items() if p.share_with_friends])
+    result = [
+        {
+            "user_id": f.friend_id,
+            "display_name": people[f.friend_id].display_name,
+            "since": f.since,
+            "sharing": f.friend_id in minutes,
+            "minutes_this_week": minutes.get(f.friend_id),
+        }
+        # A friend whose account is mid-deletion has no user any more: leave them out.
+        for f in friendships
+        if f.friend_id in people
+    ]
+    return {"friends": sorted(result, key=lambda f: f["display_name"].casefold())}
+
+
+@app.delete("/friends/{friend_id}", status_code=204)
+def remove_friend(user_id: UserIdDep, friends: FriendsDep, friend_id: str) -> None:
+    try:
+        friends.remove(user_id, friend_id)
+    except NotFriends:
+        raise HTTPException(404, "not found") from None
+
+
+def _minutes_this_week(stats: Any, user_ids: list[str]) -> dict[str, int]:
+    """Minutes this week for each user, from their `totals#this_week` document. Users whose
+    stats haven't been built yet count as 0."""
+    docs = _stat_docs(stats, [(u, "totals#this_week") for u in user_ids])
+    return {u: round(docs.get((u, "totals#this_week"), {}).get("hours", 0) * 60) for u in user_ids}
+
+
+def _stat_docs(stats: Any, keys: list[tuple[str, str]]) -> dict[tuple[str, str], Any]:
+    """Several users' stat documents by (user_id, stat_name), in BatchGetItems of up to 100."""
+    found: dict[tuple[str, str], Any] = {}
+    unique = list(dict.fromkeys(keys))
+    for start in range(0, len(unique), 100):
+        chunk = [{"user_id": u, "stat_name": n} for u, n in unique[start : start + 100]]
+        request = {stats.name: {"Keys": chunk}}
+        while request:
+            response = stats.meta.client.batch_get_item(RequestItems=request)
+            for item in response["Responses"].get(stats.name, []):
+                found[(item["user_id"], item["stat_name"])] = json.loads(item["data"])
+            request = response.get("UnprocessedKeys") or {}
+    return found
 
 
 handler = Mangum(app, lifespan="off")
