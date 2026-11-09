@@ -9,7 +9,7 @@ import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
 import { useOpenArtist } from '@/lib/artist'
-import { ago, count, greeting } from '@/lib/format'
+import { ago, count, greeting, timeTile } from '@/lib/format'
 import { fillPeriod } from '@/lib/periods'
 import { useMe, useRecent, useStat } from '@/lib/queries'
 import type { Period, TopRow, Totals } from '@/lib/types'
@@ -101,10 +101,11 @@ function Today() {
   const artists = useStat<TopRow[]>('top_artists', 'today')
   const tracks = useStat<TopRow[]>('top_tracks', 'today')
   const t = totals.data
+  const time = timeTile(t ? t.hours * 60 : 0)
   return (
     <Section title="Today" className="h-full">
       <div className="grid grid-cols-2 gap-3">
-        <Metric label="Minutes" value={t ? count(t.hours * 60) : '–'} />
+        <Metric label={time.label} value={t ? time.value : '–'} />
         <Metric label="Streams" value={t ? count(t.streams) : '–'} />
         <Metric label="Artists" value={t ? count(t.artists) : '–'} />
         <Metric label="Tracks" value={t ? count(t.tracks) : '–'} />

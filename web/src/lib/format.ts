@@ -1,3 +1,5 @@
+import { getSettings } from './settings'
+
 export function duration(minutes: number): string {
   const total = Math.round(minutes)
   const h = Math.floor(total / 60)
@@ -9,6 +11,24 @@ export function duration(minutes: number): string {
 /** "1,766 minutes": time is always shown in minutes first. */
 export function minutes(m: number): string {
   return `${count(m)} ${Math.round(m) === 1 ? 'minute' : 'minutes'}`
+}
+
+/** Time listened in the unit chosen in Settings: "1,766 minutes" or "29h 26m". */
+export function listened(m: number): string {
+  return getSettings().time === 'hours' ? duration(m) : minutes(m)
+}
+
+/** The same time in the other unit, for brackets, or null when it would say nothing new. */
+export function listenedOther(m: number): string | null {
+  if (m < 60) return null
+  return getSettings().time === 'hours' ? minutes(m) : duration(m)
+}
+
+/** A tile's label and value for time listened: "Minutes" and "342", or "Time" and "5h 42m". */
+export function timeTile(m: number): { label: string; value: string } {
+  return getSettings().time === 'hours'
+    ? { label: 'Time', value: duration(m) }
+    : { label: 'Minutes', value: count(m) }
 }
 
 export function count(n: number): string {

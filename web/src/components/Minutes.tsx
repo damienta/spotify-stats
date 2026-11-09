@@ -1,7 +1,8 @@
-import { duration, minutes } from '@/lib/format'
+import { listened, listenedOther } from '@/lib/format'
+import { useSettings } from '@/lib/settings'
 import { cn } from '@/lib/utils'
 
-/** Time listened: minutes first, with the same time in hours in brackets after it. */
+/** Time listened in the unit chosen in Settings, with the other unit in brackets after it. */
 export function Minutes({
   value,
   hours = true,
@@ -11,12 +12,12 @@ export function Minutes({
   hours?: boolean
   className?: string
 }) {
+  useSettings() // redraw when the unit changes
+  const other = hours ? listenedOther(value) : null
   return (
     <span className={cn('tabular', className)}>
-      {minutes(value)}
-      {hours && value >= 60 && (
-        <span className="ml-1 font-normal text-muted">({duration(value)})</span>
-      )}
+      {listened(value)}
+      {other && <span className="ml-1 font-normal text-muted">({other})</span>}
     </span>
   )
 }

@@ -250,7 +250,7 @@ export function Friend({ userId, onBack }: { userId: string; onBack: () => void 
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <Tile label="Minutes this week">
+            <Tile label="This week">
               <Minutes value={s.minutes_this_week} hours={false} />
             </Tile>
             <Tile label="Current streak">

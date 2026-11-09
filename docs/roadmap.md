@@ -33,8 +33,9 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 - [x] Concerts: your top artists' upcoming UK gigs (Ticketmaster Discovery API)
 - [x] Home city setting for concerts (London first by default), sale status on each date
 - [ ] Ticketmaster affiliate links (Impact)
-- [ ] Host the web app (Cloudflare Pages) and request Spotify's quota extension
-- [ ] Settings, more: high contrast, colour themes, minutes vs hours
+- [x] Host the web app (Cloudflare Pages)
+- [ ] Request Spotify's quota extension
+- [x] Settings, more: high contrast, accent colours, minutes or hours
 - [ ] Catalogue queue: a steady trickle of lookups instead of bursts; new users first
 - [ ] Mobile app (Expo / React Native, runs in Expo Go): login, Home, Top, Stats
 
