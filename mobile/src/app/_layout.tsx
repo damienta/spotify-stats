@@ -1,11 +1,17 @@
-import Ionicons from '@expo/vector-icons/Ionicons'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DarkTheme, ThemeProvider } from 'expo-router'
-import { Tabs } from 'expo-router/js-tabs'
+import { Stack } from 'expo-router/stack'
+import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
-import type { ComponentProps } from 'react'
+import { useEffect } from 'react'
 
+import { restoreSession, useSession } from '@/lib/session'
 import { colors } from '@/theme'
+
+// Keep the splash screen up until we know whether someone is logged in, so the login screen
+// doesn't flash before Home.
+SplashScreen.preventAutoHideAsync()
+restoreSession()
 
 const queryClient = new QueryClient()
 
@@ -15,43 +21,33 @@ const theme = {
   colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, primary: colors.accent },
 }
 
-type IconName = ComponentProps<typeof Ionicons>['name']
+export default function RootLayout() {
+  const session = useSession()
+  const inside = session.status === 'in' || session.status === 'demo'
 
-/** The five tabs, as on the web app: icon outlined, filled when it's the open tab. */
-const TABS: { name: string; title: string; icon: IconName; active: IconName }[] = [
-  { name: 'index', title: 'Home', icon: 'home-outline', active: 'home' },
-  { name: 'top', title: 'Top', icon: 'trophy-outline', active: 'trophy' },
-  { name: 'stats', title: 'Stats', icon: 'stats-chart-outline', active: 'stats-chart' },
-  { name: 'friends', title: 'Friends', icon: 'people-outline', active: 'people' },
-  { name: 'settings', title: 'Settings', icon: 'settings-outline', active: 'settings' },
-]
+  useEffect(() => {
+    if (session.status !== 'loading') SplashScreen.hideAsync()
+    // Logged out or switched between demo and a real account: drop the last person's data.
+    if (session.status === 'out') queryClient.clear()
+  }, [session.status])
 
-export default function Layout() {
+  // The navigator always renders (the router needs it); while the token is read, the splash
+  // screen still covers the login screen underneath.
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            tabBarActiveTintColor: colors.accent,
-            tabBarInactiveTintColor: colors.muted,
-            tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-          }}
-        >
-          {TABS.map((t) => (
-            <Tabs.Screen
-              key={t.name}
-              name={t.name}
-              options={{
-                title: t.title,
-                tabBarIcon: ({ color, size, focused }) => (
-                  <Ionicons name={focused ? t.active : t.icon} color={color as string} size={size} />
-                ),
-              }}
-            />
-          ))}
-        </Tabs>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          {/* Logged out, only Login (and the login return address) exist; logged in or in the
+              demo, only the tabs. Switching the session swaps them, so no screen navigates. */}
+          <Stack.Protected guard={!inside}>
+            <Stack.Screen name="login" />
+            <Stack.Screen name="auth" />
+          </Stack.Protected>
+          <Stack.Protected guard={inside}>
+            <Stack.Screen name="(tabs)" />
+          </Stack.Protected>
+        </Stack>
       </ThemeProvider>
     </QueryClientProvider>
   )
