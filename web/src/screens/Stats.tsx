@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Problem, Skeleton } from '@/components/States'
 import { MaybeLink } from '@/components/MaybeLink'
 import { Minutes } from '@/components/Minutes'
-import { ago, count, duration, minutes, percent } from '@/lib/format'
+import { ago, count, listened, listenedOther, percent } from '@/lib/format'
 import { fillPeriod, GRAIN_STAT, type PeriodName } from '@/lib/periods'
 import { useRefreshStats, useStat, useStatBuiltAt } from '@/lib/queries'
 import type {
@@ -45,14 +45,14 @@ function BigNumber({ period }: { period: PeriodName }) {
           <p className="text-6xl font-extrabold tracking-tight text-accent sm:text-7xl tabular">
             <BlurText
               key={`${period}-${totals.data.hours}`}
-              text={minutes(totals.data.hours * 60)}
+              text={listened(totals.data.hours * 60)}
               delay={90}
               className="justify-center"
             />
           </p>
-          {totals.data.hours >= 1 && (
+          {listenedOther(totals.data.hours * 60) && (
             <p className="mt-1 text-lg font-semibold text-muted tabular">
-              ({duration(totals.data.hours * 60)})
+              ({listenedOther(totals.data.hours * 60)})
             </p>
           )}
         </>

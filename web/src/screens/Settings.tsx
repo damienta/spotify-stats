@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, LogOut, RotateCcw, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ExternalLink, LogOut, RotateCcw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Section } from '@/components/Section'
@@ -8,9 +8,13 @@ import { Button } from '@/components/ui/button'
 import { deleteAccount, logout } from '@/lib/api'
 import { useMe, useResetInvite, useSetSharing } from '@/lib/queries'
 import {
+  type Accent,
+  ACCENTS,
   CITIES,
+  type Contrast,
   type MotionSetting,
   type TextSize,
+  type TimeUnit,
   updateSettings,
   useSettings,
 } from '@/lib/settings'
@@ -23,6 +27,28 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
         {hint && <p className="text-sm text-muted">{hint}</p>}
       </div>
       {children}
+    </div>
+  )
+}
+
+/** One round swatch per accent colour; a radio group, so arrow keys aren't needed to reach it. */
+function AccentPicker({ value }: { value: Accent }) {
+  return (
+    <div role="radiogroup" aria-label="Accent colour" className="flex gap-3 sm:w-80 sm:justify-end">
+      {(Object.keys(ACCENTS) as Accent[]).map((a) => (
+        <button
+          key={a}
+          role="radio"
+          aria-checked={a === value}
+          aria-label={ACCENTS[a].label}
+          title={ACCENTS[a].label}
+          onClick={() => updateSettings({ accent: a })}
+          className="grid size-9 place-items-center rounded-full ring-offset-2 ring-offset-bg transition-transform hover:scale-110 aria-checked:ring-2 aria-checked:ring-white"
+          style={{ backgroundColor: ACCENTS[a].base }}
+        >
+          {a === value && <Check className="size-4 text-black" strokeWidth={3} />}
+        </button>
+      ))}
     </div>
   )
 }
@@ -137,6 +163,31 @@ export function Settings() {
                 { value: 'larger', label: 'Extra large' },
               ]}
             />
+          </Row>
+          <Row label="Show time in" hint="Minutes, like Spotify Wrapped, or hours and minutes.">
+            <Segmented<TimeUnit>
+              className="sm:w-80"
+              value={settings.time}
+              onChange={(time) => updateSettings({ time })}
+              options={[
+                { value: 'minutes', label: 'Minutes' },
+                { value: 'hours', label: 'Hours' },
+              ]}
+            />
+          </Row>
+          <Row label="Contrast" hint="High makes grey text brighter and edges clearer.">
+            <Segmented<Contrast>
+              className="sm:w-80"
+              value={settings.contrast}
+              onChange={(contrast) => updateSettings({ contrast })}
+              options={[
+                { value: 'normal', label: 'Normal' },
+                { value: 'high', label: 'High' },
+              ]}
+            />
+          </Row>
+          <Row label="Colour" hint="Buttons, charts and highlights.">
+            <AccentPicker value={settings.accent} />
           </Row>
           <Row label="Animations" hint="Reduce turns off sliding and moving.">
             <Segmented<MotionSetting>

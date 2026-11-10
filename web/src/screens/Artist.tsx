@@ -12,7 +12,7 @@ import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
-import { ago, count, gigDate, minutes } from '@/lib/format'
+import { ago, count, gigDate, listened, timeTile } from '@/lib/format'
 import { ticketState } from '@/lib/gigs'
 import { useArtist, useStat } from '@/lib/queries'
 import type { ArtistPage, Period, Touring } from '@/lib/types'
@@ -122,7 +122,7 @@ function History({ page }: { page: ArtistPage }) {
         <MinutesChart points={points} height={160} />
         {busiest && (
           <p className="text-xs text-faint">
-            Busiest month: {busiest.label}, {minutes(busiest.minutes)}
+            Busiest month: {busiest.label}, {listened(busiest.minutes)}
           </p>
         )}
       </SpotlightCard>
@@ -236,7 +236,7 @@ export function Artist({ name, onBack }: { name: string; onBack: () => void }) {
         >
           <Hero page={page.data} />
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tile label="Minutes">{count(page.data.minutes)}</Tile>
+            <Tile label={timeTile(page.data.minutes).label}>{timeTile(page.data.minutes).value}</Tile>
             <Tile label="Streams">{count(page.data.streams)}</Tile>
             <Tile label="Tracks played">{count(page.data.tracks)}</Tile>
             <Tile label="Of all your listening">

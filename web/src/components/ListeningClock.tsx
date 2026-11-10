@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-import { duration, minutes } from '@/lib/format'
+import { listened, listenedOther } from '@/lib/format'
 import type { ClockCell } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -20,8 +20,11 @@ const ARROWS: Record<string, [number, number]> = {
 
 const hour = (h: number) => `${String(h).padStart(2, '0')}:00`
 const pct = (part: number, whole: number) => `${Math.round((100 * part) / Math.max(1, whole))}%`
-// Minutes first, with hours in brackets once it's an hour or more.
-const time = (m: number) => (m >= 60 ? `${minutes(m)} (${duration(m)})` : minutes(m))
+// The chosen unit first, with the other in brackets once it's an hour or more.
+const time = (m: number) => {
+  const other = listenedOther(m)
+  return other ? `${listened(m)} (${other})` : listened(m)
+}
 const sum = (cells: ClockCell[]) => cells.reduce((s, c) => s + c.minutes, 0)
 /** Cell brightness: square root so quiet hours still show next to busy ones. */
 const shade = (m: number, max: number) => (m ? 0.15 + 0.85 * Math.sqrt(m / max) : 0.05)
@@ -76,11 +79,11 @@ export function ListeningClock({ cells }: { cells: ClockCell[] }) {
         <Tile
           label="Busiest hour"
           value={`${DAYS[peak.weekday].slice(0, 3)} ${hour(peak.hour)}`}
-          hint={minutes(peak.minutes)}
+          hint={listened(peak.minutes)}
         />
         <Tile label="Biggest day" value={DAYS[topDay]} hint={`${pct(byDay[topDay], total)} of your listening`} />
         <Tile label="Mostly" value={topPart.name} hint={`${pct(topPart.minutes, total)} of your listening`} />
-        <Tile label="Total" value={minutes(total)} hint={duration(total)} />
+        <Tile label="Total" value={listened(total)} hint={listenedOther(total) ?? ''} />
       </div>
 
       <div
