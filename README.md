@@ -16,7 +16,8 @@ works and why, and [docs/HANDOFF.md](docs/HANDOFF.md) for where it stands.
 | `ingest/` | Python: Spotify OAuth, the recently-played poller, GDPR export import |
 | `api/` | Python: FastAPI app served from Lambda |
 | `jobs/` | Python: batch jobs (DuckDB stats, later Spark) |
-| `ios/` | SwiftUI app |
+| `web/` | The web app (React, Vite), hosted on Cloudflare Pages |
+| `mobile/` | The phone app (Expo, React Native), run locally in Expo Go |
 | `docs/` | Roadmap, architecture and decisions, ADRs, handoff |
 | `data/` | Local-only scratch data. Ignored by git: never commit Spotify exports |
 

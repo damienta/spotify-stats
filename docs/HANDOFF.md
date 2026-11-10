@@ -140,10 +140,9 @@ links (Impact).
 - On-demand lookups for a row that's missing a picture; refresh entries older than a few
   months.
 
-**Phone app** (Expo Go, Classic Spotify + glass)
-- Login, Home, Charts, Stats; reuse the API and the web app's types. Libraries:
-  expo-glass-effect / expo-blur, Expo Router native tabs, Skia + victory-native charts,
-  Reanimated + Moti, expo-haptics, expo-image.
+**Phone app** (Expo Go, local only): see [plans/mobile.md](plans/mobile.md). PR 1 (set-up,
+demo data, Home in layout E1) is built; next login, then Top and Stats, then Friends, artist
+pages and Settings.
 
 **Data platform (the CV stages)**
 - Stage 2: Airflow + dbt over the S3 data (star schema, tests), genres from Last.fm.
