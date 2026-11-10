@@ -3,7 +3,6 @@
 import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
 
-import { ACCENTS, useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
 interface Position {
@@ -19,11 +18,8 @@ interface SpotlightCardProps extends React.PropsWithChildren {
 const SpotlightCard: React.FC<SpotlightCardProps> = ({
   children,
   className = '',
-  spotlightColor
+  spotlightColor = 'rgba(29, 185, 84, 0.18)'
 }) => {
-  // The glow follows the accent colour unless a card asks for its own.
-  const { accent } = useSettings();
-  const glow = spotlightColor ?? `rgba(${(ACCENTS[accent] ?? ACCENTS.green).rgb}, 0.18)`;
   const divRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
@@ -74,7 +70,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
         className="pointer-events-none absolute inset-0 m-0! opacity-0 transition-opacity duration-500 ease-in-out"
         style={{
           opacity,
-          background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${glow}, transparent 80%)`
+          background: `radial-gradient(circle at ${position.x}px ${position.y}px, ${spotlightColor}, transparent 80%)`
         }}
       />
       {children}

@@ -35,7 +35,7 @@ Costs stay near £0: the production path is serverless on AWS, and the heavy eng
 - [ ] Ticketmaster affiliate links (Impact)
 - [x] Host the web app (Cloudflare Pages)
 - [ ] Request Spotify's quota extension
-- [x] Settings, more: high contrast, accent colours, minutes or hours
+- [x] Settings, more: high contrast, minutes or hours
 - [ ] Catalogue queue: a steady trickle of lookups instead of bursts; new users first
 - [ ] Mobile app (Expo / React Native, runs in Expo Go): login, Home, Top, Stats
 
