@@ -1,7 +1,7 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 
 import { duration } from '@/lib/format'
-import { ACCENTS, useSettings } from '@/lib/settings'
+import { useSettings } from '@/lib/settings'
 
 export interface ChartPoint {
   label: string
@@ -9,7 +9,7 @@ export interface ChartPoint {
   highlight?: boolean
 }
 
-/** Minutes listened per hour, day or month, as bars in the accent colour. */
+/** Minutes listened per hour, day or month, as green bars. */
 export function MinutesChart({
   points,
   height = 140,
@@ -17,9 +17,8 @@ export function MinutesChart({
   points: ChartPoint[]
   height?: number | `${number}%`
 }) {
-  // SVG fills can't read CSS variables reliably, so take the colours from the settings.
-  const { accent, contrast } = useSettings()
-  const colours = ACCENTS[accent] ?? ACCENTS.green
+  // The axis labels are SVG, so they don't pick up the high-contrast CSS; brighten them here.
+  const { contrast } = useSettings()
   // Only label every nth bar so 24 hours or 31 days don't overlap.
   const every = Math.ceil(points.length / 8)
   const busiest = points.reduce((a, b) => (b.minutes > a.minutes ? b : a), points[0])
@@ -51,7 +50,7 @@ export function MinutesChart({
         />
         <Bar dataKey="minutes" radius={[3, 3, 0, 0]} isAnimationActive>
           {points.map((p, i) => (
-            <Cell key={i} fill={p.highlight ? colours.bright : colours.base} fillOpacity={p.minutes ? 1 : 0.2} />
+            <Cell key={i} fill={p.highlight ? '#1ed760' : '#1db954'} fillOpacity={p.minutes ? 1 : 0.2} />
           ))}
         </Bar>
       </BarChart>

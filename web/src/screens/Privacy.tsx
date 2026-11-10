@@ -56,7 +56,7 @@ export function Privacy() {
 
       <Part title="In your browser">
         <p>
-          Your login and display settings (text size, time unit, contrast, colour, animations,
+          Your login and display settings (text size, time unit, contrast, animations,
           home city) are saved in this browser only.
         </p>
       </Part>
