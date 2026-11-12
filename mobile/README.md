@@ -11,6 +11,7 @@ npx expo start --tunnel # if the phone can't reach the PC over Wi-Fi
 npm run web             # the same app in a browser
 ```
 
-For now it shows demo data; logging in with Spotify comes next.
+Log in with Spotify, or tap **Try the demo first** for made-up data. In the browser build
+(`npm run web`) only the demo works: browsers block direct calls to the API, phones don't.
 
 Checks: `npm run typecheck` and `npm run lint`.
