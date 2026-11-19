@@ -1,6 +1,6 @@
 # Phone app (Expo)
 
-Status: PR 1 built (set-up, demo data, Home). Runs locally in Expo Go only: no App Store, no
+Status: PR 1 (set-up, demo data, Home) merged; PR 2 (login) built. Runs locally in Expo Go only: no App Store, no
 EAS builds, no hosting.
 
 ## What it is
@@ -14,6 +14,8 @@ Settings), Spotify green on near-black.
 - `cd mobile && npx expo start`, then scan the QR code with the **Expo Go** app. Phone and PC on
   the same Wi-Fi, or `npx expo start --tunnel`.
 - `npm run web` opens the same app in a browser, which is how screens are checked from a PC.
+  Demo mode only there: the browser blocks calls to the API (no CORS on the Lambda), which a
+  phone doesn't.
 - Expo Go only runs the newest Expo SDK, so the project stays on it (SDK 58 now).
 
 ## Login (PR 2)
@@ -50,8 +52,10 @@ where they matter.
 
 1. **Set-up, demo mode, Home** (done): Expo project in `mobile/`, tab bar, Home in layout E1,
    placeholder tabs, CI (type-check and lint).
-2. **Login and real data**: Login screen, Spotify login through Expo Go, token in secure store,
-   log out, demo as a choice on the login screen.
+2. **Login and real data** (built): Login screen with "Try the demo first", Spotify login through
+   Expo Go, token in the keychain, Settings with log out / leave demo. `Stack.Protected` guards
+   swap Login and the tabs when the session changes, so no screen navigates by hand. A 401 from
+   the API logs out.
 3. **Top and Stats**: top 10, 50 and 100 for each window; day, week, month and year charts, the
    listening clock.
 4. **Friends, artist pages, Settings**: Friends tab, friend page, invites through the share
