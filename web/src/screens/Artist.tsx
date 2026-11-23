@@ -62,8 +62,46 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/**
+ * Your rank for this artist in each range, as four tiles: the number big, the range small
+ * underneath, so "#4" and "4 weeks" can't run together. Your best rank is filled green; on a
+ * tie, the most recent range, since that's the one that says how much you play them now.
+ */
+function Ranks({ ranks }: { ranks: ArtistPage['ranks'] }) {
+  const ranked = RANGES.map((r) => ranks[r.key]).filter((n): n is number => n != null)
+  if (!ranked.length) return null
+  const best = RANGES.find((r) => ranks[r.key] === Math.min(...ranked))?.key
+  return (
+    <ul className="mx-auto grid max-w-md grid-cols-4 gap-2 sm:mx-0" aria-label="Your rank for this artist">
+      {RANGES.map((r) => {
+        const rank = ranks[r.key]
+        const top = r.key === best
+        return (
+          <li
+            key={r.key}
+            className={cn(
+              'rounded-2xl px-2 py-2.5 text-center',
+              top ? 'bg-accent text-black' : 'glass',
+            )}
+          >
+            <p aria-hidden="true" className={cn('text-2xl font-extrabold tabular sm:text-3xl', rank == null && 'text-faint')}>
+              {rank == null ? '–' : `#${rank}`}
+            </p>
+            <p aria-hidden="true" className={cn('text-xs', top ? 'font-semibold' : 'text-muted')}>
+              {r.label}
+            </p>
+            {/* Screen readers hear "number 4 over 4 weeks", not "hash 4 4 weeks". */}
+            <span className="sr-only">
+              {rank == null ? `Not in your top 100 over ${r.label}` : `Number ${rank} over ${r.label}`}
+            </span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function Hero({ page }: { page: ArtistPage }) {
-  const ranked = RANGES.filter((r) => page.ranks[r.key])
   return (
     <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-end sm:text-left">
       <Artwork
@@ -77,19 +115,7 @@ function Hero({ page }: { page: ArtistPage }) {
         <h1 className="text-4xl font-extrabold tracking-tight break-words sm:text-5xl">
           <BlurText key={page.name} text={page.name} delay={60} className="justify-center sm:justify-start" />
         </h1>
-        <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-          {ranked.map((r) => (
-            <span
-              key={r.key}
-              className={cn(
-                'rounded-full px-3 py-1 text-xs font-semibold',
-                page.ranks[r.key] === 1 ? 'bg-accent text-black' : 'glass text-muted',
-              )}
-            >
-              #{page.ranks[r.key]} {r.label}
-            </span>
-          ))}
-        </div>
+        <Ranks ranks={page.ranks} />
       </div>
       {page.url && (
         <Button asChild className="shrink-0">
