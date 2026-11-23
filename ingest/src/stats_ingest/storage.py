@@ -48,6 +48,16 @@ def artist_stat_name(name: str) -> str:
     return f"artist#{hashlib.sha256(name.casefold().encode()).hexdigest()[:16]}"
 
 
+def album_stat_name(name: str, artist: str) -> str:
+    """The stats item holding one album's page, for example `album#9c1e...`.
+
+    An album is its name plus its artist ("Greatest Hits" is many albums). Hashed and
+    case-folded like artist_stat_name; the separator can't appear in either name.
+    """
+    key = f"{artist.casefold()}\x00{name.casefold()}"
+    return f"album#{hashlib.sha256(key.encode()).hexdigest()[:16]}"
+
+
 def user_prefixes(user_id: str) -> list[str]:
     """Every S3 prefix holding one user's data; deleting an account empties all of them."""
     return [

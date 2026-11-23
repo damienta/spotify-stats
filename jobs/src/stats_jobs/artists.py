@@ -12,7 +12,7 @@ from typing import Any
 
 import duckdb
 
-from stats_ingest.storage import artist_stat_name
+from stats_ingest.storage import album_stat_name, artist_stat_name
 from stats_jobs.habits import Period
 from stats_jobs.stats import STREAM_THRESHOLD_MS, TopRow
 
@@ -20,6 +20,18 @@ from stats_jobs.stats import STREAM_THRESHOLD_MS, TopRow
 RANK_WINDOWS = ("4_weeks", "6_months", "12_months", "all_time")
 PAGES_FROM_EACH = 50
 TOP_TRACKS = 10
+# Enough album covers for a 2-by-3 grid beside the top tracks.
+TOP_ALBUMS = 6
+
+
+@dataclass(frozen=True)
+class AlbumRow:
+    name: str
+    streams: int
+    hours: float
+    track_id: str | None
+    # Whether the album has its own page (stats_jobs.albums), so the app only links those.
+    page: bool
 
 
 @dataclass(frozen=True)
@@ -37,6 +49,7 @@ class ArtistPage:
     ranks: dict[str, int | None]
     minutes_by_month: list[Period]
     top_tracks: list[TopRow]
+    top_albums: list[AlbumRow]
     # One of their tracks: how stats_jobs.catalog finds the artist's picture and link.
     track_id: str | None = None
 
@@ -50,8 +63,11 @@ def page_artists(stats: dict[str, Any]) -> list[str]:
     return list(names)
 
 
-def artist_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[str, ArtistPage]:
-    """Every artist page, keyed by stat name. `stats` is what build_documents has so far."""
+def artist_pages(
+    con: duckdb.DuckDBPyConnection, stats: dict[str, Any], album_pages: dict[str, Any] | None = None
+) -> dict[str, ArtistPage]:
+    """Every artist page, keyed by stat name. `stats` is what build_documents has so far;
+    `album_pages` says which of their albums can link to a page."""
     names = page_artists(stats)
     if not names:
         return {}
@@ -115,6 +131,28 @@ def artist_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[
     ).fetchall():
         tracks.setdefault(name, []).append(TopRow(track, name, streams, hours, track_id))
 
+    albums: dict[str, list[AlbumRow]] = {}
+    for name, album, streams, hours, track_id in con.execute(
+        """
+        SELECT
+            artist_name,
+            album_name,
+            count(*) FILTER (WHERE ms_played >= $threshold) AS streams,
+            sum(ms_played) / 3600000.0,
+            first(track_id ORDER BY ms_played DESC, track_id) FILTER (WHERE track_id IS NOT NULL)
+        FROM listens
+        WHERE list_contains($names, artist_name) AND album_name IS NOT NULL
+        GROUP BY artist_name, album_name
+        QUALIFY row_number() OVER (
+            PARTITION BY artist_name ORDER BY sum(ms_played) DESC, streams DESC, album_name
+        ) <= $limit
+        ORDER BY artist_name, sum(ms_played) DESC, streams DESC, album_name
+        """,
+        {**params, "limit": TOP_ALBUMS},
+    ).fetchall():
+        page = album_stat_name(album, name) in (album_pages or {})
+        albums.setdefault(name, []).append(AlbumRow(album, streams, hours, track_id, page))
+
     pages = {}
     for name, minutes, streams, n_tracks, first, first_track, last, track_id in summary:
         pages[artist_stat_name(name)] = ArtistPage(
@@ -129,6 +167,7 @@ def artist_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[
             ranks={w: ranks[w].get(name) for w in RANK_WINDOWS},
             minutes_by_month=months.get(name, []),
             top_tracks=tracks.get(name, []),
+            top_albums=albums.get(name, []),
             track_id=track_id,
         )
     return pages

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, api, type StatDocument } from './api'
 import type {
+  AlbumPage,
   ArtistPage,
   Compare,
   Friend,
@@ -42,6 +43,20 @@ export function useArtist(name: string) {
   return useQuery({
     queryKey: ['stat', 'artist', name.toLowerCase()],
     queryFn: () => api<StatDocument<ArtistPage>>(`/me/artist?name=${encodeURIComponent(name)}`),
+    retry,
+    staleTime: 5 * 60_000,
+    select: (doc) => doc.data,
+  })
+}
+
+/** One of your top albums' pages; a 404 means it isn't in your top albums. */
+export function useAlbum(name: string, artist: string) {
+  return useQuery({
+    queryKey: ['stat', 'album', artist.toLowerCase(), name.toLowerCase()],
+    queryFn: () =>
+      api<StatDocument<AlbumPage>>(
+        `/me/album?name=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`,
+      ),
     retry,
     staleTime: 5 * 60_000,
     select: (doc) => doc.data,

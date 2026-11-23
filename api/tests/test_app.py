@@ -21,7 +21,7 @@ from stats_api.app import (
 from stats_api.friends import FriendsTable
 from stats_api.sessions import sign
 from stats_ingest.spotify import SpotifyConfig, Tokens
-from stats_ingest.storage import UsersTable, artist_stat_name, new_user
+from stats_ingest.storage import UsersTable, album_stat_name, artist_stat_name, new_user
 
 SETTINGS = Settings(
     SpotifyConfig("client-id", "client-secret", "https://api.example/auth/callback"),
@@ -207,6 +207,20 @@ def test_artist_pages_are_found_by_name_whatever_the_case(client):
     assert missing.status_code == 404
     assert client.get("/me/artist", params={"name": ""}, headers=auth()).status_code == 422
     assert client.get("/me/artist", params={"name": "Jack Wolf"}).status_code == 401
+
+
+def test_album_pages_need_the_album_and_its_artist(client):
+    put_stat(album_stat_name("Debut", "Jack Wolf"), {"name": "Debut", "minutes": 30})
+    put_stat(album_stat_name("Debut", "Someone Else"), {"name": "Debut", "minutes": 1})
+
+    for name, artist in (("Debut", "Jack Wolf"), ("debut", "JACK WOLF")):
+        response = client.get("/me/album", params={"name": name, "artist": artist}, headers=auth())
+        assert response.json()["data"] == {"name": "Debut", "minutes": 30}
+    other = client.get("/me/album", params={"name": "Debut", "artist": "Nobody"}, headers=auth())
+    assert other.status_code == 404
+    assert client.get("/me/album", params={"name": "Debut"}, headers=auth()).status_code == 422
+    params = {"name": "Debut", "artist": "Jack Wolf"}
+    assert client.get("/me/album", params=params).status_code == 401
 
 
 def test_list_stats_hides_internal_items(client):

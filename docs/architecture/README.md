@@ -151,6 +151,8 @@ Spotify live.
 | `PATCH /me` | Change `share_with_friends` |
 | `GET /me/overview?window=` | Totals and top 5s in one call |
 | `GET /me/stats/{stat}?window=` | One stat document |
+| `GET /me/artist?name=` | One of your top artists' pages (`artist#<hash>`) |
+| `GET /me/album?name=&artist=` | One of your top albums' pages (`album#<hash>` of artist + album) |
 | `GET /me/now-playing` | Live from Spotify, cached 5 s per user |
 | `GET /me/recent?limit=` | Live from Spotify; stores plays the poller hasn't yet |
 | `GET /me/stats/concerts` | Your top artists with UK dates (built hourly from Ticketmaster) |

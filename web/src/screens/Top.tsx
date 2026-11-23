@@ -9,6 +9,7 @@ import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
+import { PAGES_FROM_EACH, useOpenAlbum } from '@/lib/album'
 import { useOpenArtist } from '@/lib/artist'
 import { count } from '@/lib/format'
 import { useStat } from '@/lib/queries'
@@ -36,19 +37,37 @@ const RANGES: { value: Range; label: string }[] = [
 // The list grows in steps: top 10, then 50, then 100.
 const STEPS = [10, 50, 100]
 
-/** Artists open their page in the app; tracks and albums open in Spotify. */
+/**
+ * Artists open their page in the app, and so do albums in the top 50 (the ones with a page).
+ * Tracks, and albums further down, open in Spotify.
+ */
 function RowLink({
   row,
+  rank,
   kind,
   className,
   children,
 }: {
   row: TopRow
+  rank: number
   kind: Kind
   className: string
   children: ReactNode
 }) {
   const openArtist = useOpenArtist()
+  const openAlbum = useOpenAlbum()
+  const album = kind === 'albums' && rank <= PAGES_FROM_EACH && row.artist_name
+  if (album) {
+    return (
+      <button
+        type="button"
+        onClick={() => openAlbum({ name: row.name, artist: album })}
+        className={cn('w-full text-left', className)}
+      >
+        {children}
+      </button>
+    )
+  }
   if (kind !== 'artists') {
     return (
       <MaybeLink href={row.url} className={className}>
@@ -73,6 +92,7 @@ function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
       {/* On phones the minutes drop to their own line so the name has room. */}
       <RowLink
         row={row}
+        rank={1}
         kind={kind}
         className="flex flex-wrap items-center gap-5 p-5 sm:flex-nowrap"
       >
@@ -105,6 +125,7 @@ function Row({ row, rank, kind }: { row: TopRow; rank: number; kind: Kind }) {
     <li>
       <RowLink
         row={row}
+        rank={rank}
         kind={kind}
         className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/5"
       >

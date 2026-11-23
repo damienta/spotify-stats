@@ -13,6 +13,7 @@ from typing import Any
 
 import duckdb
 
+from stats_jobs.albums import album_pages
 from stats_jobs.artists import artist_pages
 from stats_jobs.behaviour import discoveries, most_skipped, on_repeat, skip_rate
 from stats_jobs.habits import Grain, listening_clock, minutes_by, streaks
@@ -89,7 +90,9 @@ def build_documents(
         for name, data in window_stats(con, window).items():
             stats[f"{name}#{window.name}"] = data
     stats["streaks"] = streaks(con, today=now.astimezone(LOCAL_TZ).date())
-    stats.update(artist_pages(con, stats))
+    albums = album_pages(con, stats)
+    stats.update(albums)
+    stats.update(artist_pages(con, stats, albums))
     for y in years_listened(con):
         stats[f"wrapped#{y}"] = wrapped(con, y)
 
