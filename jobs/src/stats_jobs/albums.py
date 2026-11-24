@@ -1,4 +1,4 @@
-"""A page for each of your top albums: which songs on it you play, since when, and when.
+"""A page for each of your top albums: which songs on it you play, and since when.
 
 Like the artist pages (stats_jobs.artists): built for the top `PAGES_FROM_EACH` albums of
 every range the Top tab shows, each its own stats item keyed by
@@ -19,10 +19,9 @@ from stats_jobs.artists import PAGES_FROM_EACH, RANK_WINDOWS
 from stats_jobs.habits import Period
 from stats_jobs.stats import STREAM_THRESHOLD_MS, TopRow
 
-# Albums are short, so show every song you've played on one, up to a long deluxe edition.
+# Every song you've played on an album, up to a long deluxe edition. The catalogue later
+# lines them up with the album's tracklist (stats_jobs.catalog.add_tracklists).
 TOP_TRACKS = 30
-# The same hours as the listening clock's parts on the web (ListeningClock.tsx).
-PARTS = {"Night": (0, 6), "Morning": (6, 12), "Afternoon": (12, 18), "Evening": (18, 24)}
 
 
 @dataclass(frozen=True)
@@ -31,7 +30,6 @@ class AlbumPage:
     artist_name: str
     minutes: float
     streams: int
-    tracks: int
     # Share of everything you've ever played, 0 to 1.
     share: float
     first_played: str
@@ -41,10 +39,6 @@ class AlbumPage:
     ranks: dict[str, int | None]
     minutes_by_month: list[Period]
     top_tracks: list[TopRow]
-    # The day you played it most, on your own clock.
-    biggest_day: Period | None
-    # Minutes in each part of the day, PARTS order.
-    time_of_day: dict[str, float]
     # One of its tracks: how stats_jobs.catalog finds the cover and the album's link.
     track_id: str | None = None
 
@@ -89,7 +83,6 @@ def album_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[s
             artist_name,
             sum(ms_played) / 60000.0,
             count(*) FILTER (WHERE ms_played >= $threshold),
-            count(DISTINCT track_name),
             min(played_at_local)::VARCHAR,
             arg_min(track_name, played_at),
             max(played_at_local)::VARCHAR,
@@ -135,41 +128,14 @@ def album_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[s
         row = TopRow(track, artist, streams, hours, track_id)
         tracks.setdefault((album, artist), []).append(row)
 
-    biggest: dict[tuple[str, str], Period] = {
-        (album, artist): Period(day, minutes)
-        for album, artist, day, minutes in con.execute(
-            f"""
-            SELECT album_name, artist_name, played_at_local::DATE AS day, sum(ms_played) / 60000.0
-            FROM {plays}
-            GROUP BY album_name, artist_name, day
-            QUALIFY row_number() OVER (
-                PARTITION BY album_name, artist_name ORDER BY sum(ms_played) DESC, day
-            ) = 1
-            """
-        ).fetchall()
-    }
-
-    parts: dict[tuple[str, str], dict[str, float]] = {}
-    for album, artist, hour, minutes in con.execute(
-        f"""
-        SELECT album_name, artist_name, hour(played_at_local), sum(ms_played) / 60000.0
-        FROM {plays}
-        GROUP BY 1, 2, 3
-        """
-    ).fetchall():
-        split = parts.setdefault((album, artist), dict.fromkeys(PARTS, 0.0))
-        part = next(name for name, (start, end) in PARTS.items() if start <= hour < end)
-        split[part] += minutes
-
     pages = {}
-    for album, artist, minutes, streams, n_tracks, first, first_track, last, track_id in summary:
+    for album, artist, minutes, streams, first, first_track, last, track_id in summary:
         key = (album, artist)
         pages[album_stat_name(album, artist)] = AlbumPage(
             name=album,
             artist_name=artist,
             minutes=minutes,
             streams=streams,
-            tracks=n_tracks,
             share=minutes / everything if everything else 0,
             first_played=first,
             first_track=first_track,
@@ -177,8 +143,6 @@ def album_pages(con: duckdb.DuckDBPyConnection, stats: dict[str, Any]) -> dict[s
             ranks={w: ranks[w].get(key) for w in RANK_WINDOWS},
             minutes_by_month=months.get(key, []),
             top_tracks=tracks.get(key, []),
-            biggest_day=biggest.get(key),
-            time_of_day=parts.get(key, dict.fromkeys(PARTS, 0.0)),
             track_id=track_id,
         )
     return pages

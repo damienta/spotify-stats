@@ -135,6 +135,15 @@ export interface AlbumRow {
   url?: string | null
 }
 
+export interface TracklistRow {
+  number: number
+  disc: number
+  name: string
+  hours: number
+  streams: number
+  url?: string | null
+}
+
 export type RankWindow = '4_weeks' | '6_months' | '12_months' | 'all_time'
 
 /** One of your top albums: the songs on it you play, since when, and when. */
@@ -143,19 +152,17 @@ export interface AlbumPage {
   artist_name: string
   minutes: number
   streams: number
-  /** How many different songs on it you've played. */
-  tracks: number
   share: number
   first_played: string
   first_track: string
   last_played: string
   ranks: Record<RankWindow, number | null>
   minutes_by_month: Period[]
+  /** Your most-played songs on it. */
   top_tracks: TopRow[]
-  /** The day you played it most. */
-  biggest_day: Period | null
-  /** Minutes in each part of the day. */
-  time_of_day: Record<'Night' | 'Morning' | 'Afternoon' | 'Evening', number>
+  /** The album's songs in order, with your plays (0 for unplayed). Missing until Spotify
+   *  has been asked for it, usually by the next hourly run. */
+  tracklist?: TracklistRow[]
   image?: string | null
   url?: string | null
 }

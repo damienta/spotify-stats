@@ -12,6 +12,8 @@ artwork from its servers.
 
     track id  → album cover, track and album links, the artists' ids
     artist id → artist photo and link (found through the artist's most-played track)
+    album id  → the album's tracklist in order (for album pages; the id comes from a track's
+                album link)
 """
 
 from __future__ import annotations
@@ -89,6 +91,19 @@ def _track_entry(track: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _tracklist_entry(body: dict[str, Any]) -> list[dict[str, Any]]:
+    # One page of up to 50 tracks covers all but the longest box sets.
+    return [
+        {
+            "number": t.get("track_number"),
+            "disc": t.get("disc_number") or 1,
+            "name": t["name"],
+            "id": t.get("id"),
+        }
+        for t in body.get("items", [])
+    ]
+
+
 def _artist_entry(artist: dict[str, Any]) -> dict[str, Any]:
     return {
         "url": (artist.get("external_urls") or {}).get("spotify"),
@@ -114,6 +129,7 @@ class Catalog:
         # A cached None means Spotify doesn't know the id, so it isn't asked again.
         self.tracks: dict[str, Any] = tracks or {}
         self.artists: dict[str, Any] = artists or {}
+        self.albums: dict[str, Any] = {}
         self.budget = budget
         self.lookups = 0
         self.stopped = False
@@ -124,9 +140,11 @@ class Catalog:
             body = json.loads(s3.get_object(Bucket=bucket, Key=CATALOG_KEY)["Body"].read())
         except s3.exceptions.NoSuchKey:
             body = {}
-        return cls(
+        catalog = cls(
             fetch, body.get("tracks"), body.get("artists"), budget, body.get("paused_until", 0)
         )
+        catalog.albums = body.get("albums") or {}
+        return catalog
 
     @property
     def paused(self) -> bool:
@@ -136,7 +154,12 @@ class Catalog:
         if not self.changed:
             return
         body = json.dumps(
-            {"tracks": self.tracks, "artists": self.artists, "paused_until": self.paused_until},
+            {
+                "tracks": self.tracks,
+                "artists": self.artists,
+                "albums": self.albums,
+                "paused_until": self.paused_until,
+            },
             ensure_ascii=False,
         )
         s3.put_object(
@@ -144,15 +167,20 @@ class Catalog:
         )
 
     def _lookup(
-        self, cache: dict[str, Any], path: str, key: str, entry: Callable[[dict], dict]
-    ) -> dict[str, Any] | None:
+        self,
+        cache: dict[str, Any],
+        path: str,
+        key: str,
+        entry: Callable[[dict], Any],
+        suffix: str = "",
+    ) -> Any:
         if key in cache:
             return cache[key]
         if self.stopped or self.paused or self.lookups >= self.budget:
             return None
         self.lookups += 1
         try:
-            found = self.fetch(f"{path}/{key}")
+            found = self.fetch(f"{path}/{key}{suffix}")
         except RateLimited as e:
             log.warning("catalog lookups paused: %s", e)
             self.stopped = True
@@ -171,6 +199,9 @@ class Catalog:
 
     def artist(self, artist_id: str) -> dict[str, Any] | None:
         return self._lookup(self.artists, "/artists", artist_id, _artist_entry)
+
+    def tracklist(self, album_id: str) -> list[dict[str, Any]] | None:
+        return self._lookup(self.albums, "/albums", album_id, _tracklist_entry, "/tracks?limit=50")
 
     def describe(self, kind: str, track_id: str | None, name: str | None) -> dict[str, Any]:
         """`image` and `url` for an artist, track or album, found through a track it plays on.
@@ -237,11 +268,46 @@ def _rows(documents: dict[str, dict[str, Any]]) -> list[tuple[tuple, str, str, d
 
 
 def enrich(documents: dict[str, dict[str, Any]], catalog: Catalog) -> int:
-    """Add `image` and `url` to every list row the catalogue can describe, in place. Returns
-    how many rows got a picture."""
+    """Add `image` and `url` to every list row the catalogue can describe, in place, then
+    tracklists to album pages. Returns how many rows got a picture."""
     pictured = 0
     for _, kind, name, row in _rows(documents):
         details = catalog.describe(kind, row.get("track_id"), name)
         row.update(details)
         pictured += bool(details.get("image"))
+    add_tracklists(documents, catalog)
     return pictured
+
+
+def _song(name: str) -> str:
+    return " ".join(name.casefold().split())
+
+
+def add_tracklists(documents: dict[str, dict[str, Any]], catalog: Catalog) -> None:
+    """Give each album page the album's songs in order, with your minutes and streams for
+    each (0 for songs you've never played). Needs the page's album link, which `enrich` has
+    just added; pages without one wait for a later run."""
+    pages = [doc["data"] for name, doc in documents.items() if name.startswith("album#")]
+    # Your best-ranked albums first, in case the run's lookup budget runs out.
+    pages.sort(key=lambda p: min([r for r in p["ranks"].values() if r] or [10**6]))
+    for page in pages:
+        url = page.get("url")
+        songs = catalog.tracklist(url.rstrip("/").rsplit("/", 1)[-1]) if url else None
+        if not songs:
+            continue
+        # Plays are matched by track id, or failing that by name: the same song can have
+        # different ids on a single and on the album.
+        by_id = {t["track_id"]: t for t in page["top_tracks"] if t.get("track_id")}
+        by_name = {_song(t["name"]): t for t in page["top_tracks"]}
+        page["tracklist"] = [
+            {
+                "number": s["number"],
+                "disc": s["disc"],
+                "name": s["name"],
+                "url": f"https://open.spotify.com/track/{s['id']}" if s.get("id") else None,
+                "hours": played.get("hours", 0),
+                "streams": played.get("streams", 0),
+            }
+            for s in songs
+            for played in [by_id.get(s.get("id")) or by_name.get(_song(s["name"])) or {}]
+        ]

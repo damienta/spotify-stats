@@ -24,9 +24,10 @@ data "aws_iam_policy_document" "stats" {
     resources = [aws_dynamodb_table.users.arn]
   }
 
+  # Query lists a user's artist and album pages so old ones can be deleted (BatchWriteItem).
   statement {
     sid       = "WriteStats"
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:BatchWriteItem"]
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:BatchWriteItem", "dynamodb:Query"]
     resources = [aws_dynamodb_table.stats.arn]
   }
 

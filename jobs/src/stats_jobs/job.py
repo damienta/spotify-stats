@@ -22,6 +22,7 @@ from typing import Any
 
 import boto3
 import httpx
+from boto3.dynamodb.conditions import Key
 from botocore.config import Config
 
 from stats_ingest.storage import (
@@ -57,6 +58,34 @@ class JobResult:
     compacted: int
     skipped: bool = False
     pictured: int = 0
+    removed: int = 0
+
+
+# Per-artist and per-album pages: built only for the current top 50s, so the ones left over
+# from artists and albums that dropped out are deleted after each build.
+PAGE_PREFIXES = ("artist#", "album#")
+
+
+def remove_old_pages(stats_table: Any, user_id: str, keep: set[str]) -> int:
+    """Delete the user's artist and album pages that this build didn't write. Returns how
+    many went. Without this an old page would stay reachable, frozen at its last update."""
+    old = []
+    for prefix in PAGE_PREFIXES:
+        kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("user_id").eq(user_id)
+            & Key("stat_name").begins_with(prefix),
+            "ProjectionExpression": "stat_name",
+        }
+        while True:
+            page = stats_table.query(**kwargs)
+            old += [i["stat_name"] for i in page["Items"] if i["stat_name"] not in keep]
+            if "LastEvaluatedKey" not in page:
+                break
+            kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+    with stats_table.batch_writer() as batch:
+        for stat_name in old:
+            batch.delete_item(Key={"user_id": user_id, "stat_name": stat_name})
+    return len(old)
 
 
 def list_listens(s3: Any, bucket: str, user_id: str) -> list[dict[str, Any]]:
@@ -122,6 +151,7 @@ def run_user(
                     "data": json.dumps(doc["data"], ensure_ascii=False),
                 }
             )
+    removed = remove_old_pages(stats_table, user_id, set(documents))
 
     # Merge every poll file into one Parquet, then delete only the files that were merged:
     # a poll that lands meanwhile is picked up next run.
@@ -149,7 +179,7 @@ def run_user(
             "generated_at": now.isoformat(),
         }
     )
-    return JobResult(user_id, len(documents), len(poll_files), pictured=pictured)
+    return JobResult(user_id, len(documents), len(poll_files), pictured=pictured, removed=removed)
 
 
 # Recent favourites and long-time ones both count for "your artists on tour".
