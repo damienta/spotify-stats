@@ -1,105 +1,21 @@
 import { motion } from 'framer-motion'
 import { ArrowLeft, Clock, ExternalLink, Ticket } from 'lucide-react'
-import type { ReactNode } from 'react'
 
 import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
+import { History, Ranks, Tile, Tracks } from '@/components/DetailParts'
 import { MaybeLink } from '@/components/MaybeLink'
-import { Minutes } from '@/components/Minutes'
-import { type ChartPoint, MinutesChart } from '@/components/MinutesChart'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
 import { Button } from '@/components/ui/button'
+import { useOpenAlbum } from '@/lib/album'
 import { ApiError } from '@/lib/api'
-import { ago, count, gigDate, listened, timeTile } from '@/lib/format'
+import { count, gigDate, listened, timeTile } from '@/lib/format'
 import { ticketState } from '@/lib/gigs'
 import { useArtist, useStat } from '@/lib/queries'
-import type { ArtistPage, Period, Touring } from '@/lib/types'
+import type { AlbumRow, ArtistPage, Touring } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const RANGES: { key: keyof ArtistPage['ranks']; label: string }[] = [
-  { key: '4_weeks', label: '4 weeks' },
-  { key: '6_months', label: '6 months' },
-  { key: '12_months', label: '12 months' },
-  { key: 'all_time', label: 'all time' },
-]
-
-const pad = (n: number) => String(n).padStart(2, '0')
-
-/** Every month from their first play to now, so gaps show as empty bars. */
-function months(data: Period[], now = new Date()): ChartPoint[] {
-  const played = data.find((p) => p.minutes > 0)
-  if (!played) return []
-  const byMonth = new Map(data.map((p) => [p.start.slice(0, 7), p.minutes]))
-  const first = new Date(`${played.start.slice(0, 7)}-01T12:00:00`)
-  const points: ChartPoint[] = []
-  const busiest = Math.max(...data.map((p) => p.minutes))
-  for (let d = first; d <= now; d = new Date(d.getFullYear(), d.getMonth() + 1, 1, 12)) {
-    const value = byMonth.get(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`) ?? 0
-    points.push({
-      label: d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }),
-      minutes: value,
-      highlight: value === busiest,
-    })
-  }
-  return points
-}
-
-const longDate = (iso: string) =>
-  new Date(iso.replace(' ', 'T')).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-
-function Tile({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <SpotlightCard>
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-2xl font-extrabold tabular">{children}</p>
-    </SpotlightCard>
-  )
-}
-
-/**
- * Your rank for this artist in each range, as four tiles: the number big, the range small
- * underneath, so "#4" and "4 weeks" can't run together. Your best rank is filled green; on a
- * tie, the most recent range, since that's the one that says how much you play them now.
- */
-function Ranks({ ranks }: { ranks: ArtistPage['ranks'] }) {
-  const ranked = RANGES.map((r) => ranks[r.key]).filter((n): n is number => n != null)
-  if (!ranked.length) return null
-  const best = RANGES.find((r) => ranks[r.key] === Math.min(...ranked))?.key
-  return (
-    <ul className="mx-auto grid max-w-md grid-cols-4 gap-2 sm:mx-0" aria-label="Your rank for this artist">
-      {RANGES.map((r) => {
-        const rank = ranks[r.key]
-        const top = r.key === best
-        return (
-          <li
-            key={r.key}
-            className={cn(
-              'rounded-2xl px-2 py-2.5 text-center',
-              top ? 'bg-accent text-black' : 'glass',
-            )}
-          >
-            <p aria-hidden="true" className={cn('text-2xl font-extrabold tabular sm:text-3xl', rank == null && 'text-faint')}>
-              {rank == null ? '–' : `#${rank}`}
-            </p>
-            <p aria-hidden="true" className={cn('text-xs', top ? 'font-semibold' : 'text-muted')}>
-              {r.label}
-            </p>
-            {/* Screen readers hear "number 4 over 4 weeks", not "hash 4 4 weeks". */}
-            <span className="sr-only">
-              {rank == null ? `Not in your top 100 over ${r.label}` : `Number ${rank} over ${r.label}`}
-            </span>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
 
 function Hero({ page }: { page: ArtistPage }) {
   return (
@@ -115,7 +31,7 @@ function Hero({ page }: { page: ArtistPage }) {
         <h1 className="text-4xl font-extrabold tracking-tight break-words sm:text-5xl">
           <BlurText key={page.name} text={page.name} delay={60} className="justify-center sm:justify-start" />
         </h1>
-        <Ranks ranks={page.ranks} />
+        <Ranks ranks={page.ranks} label="Your rank for this artist" />
       </div>
       {page.url && (
         <Button asChild className="shrink-0">
@@ -129,60 +45,44 @@ function Hero({ page }: { page: ArtistPage }) {
   )
 }
 
-function History({ page }: { page: ArtistPage }) {
-  const points = months(page.minutes_by_month)
-  const busiest = points.find((p) => p.highlight)
+/**
+ * Their albums you play most, as a grid of covers beside the top tracks. Albums with their
+ * own page open it; the rest open in Spotify.
+ */
+function Albums({ artist, albums }: { artist: string; albums: AlbumRow[] }) {
+  const openAlbum = useOpenAlbum()
   return (
-    <Section title="Minutes by month">
-      <SpotlightCard className="space-y-3">
-        <p className="text-sm text-muted">
-          First played on <span className="font-semibold text-white">{longDate(page.first_played)}</span>
-          {page.first_track && (
+    <Section title="Your top albums by them">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
+        {albums.map((a) => {
+          const body = (
             <>
-              {' '}
-              with <span className="font-semibold text-white">{page.first_track}</span>
+              <Artwork src={a.image} name={a.name} className="aspect-square w-full text-xl" />
+              <p className="mt-2 truncate text-sm font-semibold underline-offset-4 group-hover:underline">
+                {a.name}
+              </p>
+              <p className="text-xs text-muted">{listened(a.hours * 60)}</p>
             </>
-          )}
-          . Last played {ago(page.last_played.replace(' ', 'T'))} ago.
-        </p>
-        <MinutesChart points={points} height={160} />
-        {busiest && (
-          <p className="text-xs text-faint">
-            Busiest month: {busiest.label}, {listened(busiest.minutes)}
-          </p>
-        )}
-      </SpotlightCard>
-    </Section>
-  )
-}
-
-function Tracks({ page }: { page: ArtistPage }) {
-  return (
-    <Section title="Your top tracks by them">
-      <SpotlightCard className="p-2">
-        <ol>
-          {page.top_tracks.map((t, i) => (
-            <li key={t.name}>
-              <MaybeLink
-                href={t.url}
-                className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/5"
-              >
-                <span className="w-6 text-right text-sm font-semibold text-faint tabular">{i + 1}</span>
-                <Artwork src={t.image} name={t.name} className="size-11 text-xs" />
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold underline-offset-4 group-hover:underline">
-                  {t.name}
-                </p>
-                <div className="text-right text-xs">
-                  <p className="font-semibold">
-                    <Minutes value={t.hours * 60} hours={false} />
-                  </p>
-                  <p className="text-faint tabular">{count(t.streams)} streams</p>
-                </div>
-              </MaybeLink>
+          )
+          return (
+            <li key={a.name}>
+              {a.page ? (
+                <button
+                  type="button"
+                  onClick={() => openAlbum({ name: a.name, artist })}
+                  className="group w-full text-left"
+                >
+                  {body}
+                </button>
+              ) : (
+                <MaybeLink href={a.url} className="group block">
+                  {body}
+                </MaybeLink>
+              )}
             </li>
-          ))}
-        </ol>
-      </SpotlightCard>
+          )
+        })}
+      </ul>
     </Section>
   )
 }
@@ -270,10 +170,16 @@ export function Artist({ name, onBack }: { name: string; onBack: () => void }) {
             </Tile>
           </div>
           <History page={page.data} />
+          {/* Albums sit beside the tracks on wide screens and below them on phones. */}
           <div className="grid gap-8 lg:grid-cols-2">
-            <Tracks page={page.data} />
-            <Gigs name={page.data.name} />
+            <Tracks title="Your top tracks by them" tracks={page.data.top_tracks} />
+            {page.data.top_albums?.length ? (
+              <Albums artist={page.data.name} albums={page.data.top_albums} />
+            ) : (
+              <Gigs name={page.data.name} />
+            )}
           </div>
+          {page.data.top_albums?.length ? <Gigs name={page.data.name} /> : null}
         </motion.div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Nav, type Tab } from './components/Nav'
 import { Skeleton } from './components/States'
 import { finishLogin, getToken } from './lib/api'
+import { type AlbumKey, OpenAlbum, albumInPath, albumPath } from './lib/album'
 import { OpenArtist, artistInPath, artistPath } from './lib/artist'
 import { OpenFriend, forgetInvite, friendInPath, friendPath, startInvite } from './lib/friends'
 import { useSettings } from './lib/settings'
@@ -22,6 +23,7 @@ const Settings = lazy(() =>
 const Top = lazy(() => import('./screens/Top').then((m) => ({ default: m.Top })))
 const Gigs = lazy(() => import('./screens/Gigs').then((m) => ({ default: m.Gigs })))
 const Artist = lazy(() => import('./screens/Artist').then((m) => ({ default: m.Artist })))
+const Album = lazy(() => import('./screens/Album').then((m) => ({ default: m.Album })))
 const Friends = lazy(() => import('./screens/Friends').then((m) => ({ default: m.Friends })))
 const Friend = lazy(() => import('./screens/Friend').then((m) => ({ default: m.Friend })))
 const AddFriend = lazy(() =>
@@ -58,6 +60,8 @@ export function App() {
   const settings = useSettings()
   // An artist's page sits over the tabs at /artist/<name>, so the browser's back button works.
   const [artist, setArtist] = useState<string | null>(() => artistInPath())
+  // An album's page the same way, at /album/<artist>/<album>.
+  const [album, setAlbum] = useState<AlbumKey | null>(() => albumInPath())
   // A friend's page works the same way at /friend/<id>; an artist page can open over it.
   const [friend, setFriend] = useState<string | null>(() => friendInPath())
   const [invite, setInvite] = useState<string | null>(pendingInvite)
@@ -65,6 +69,7 @@ export function App() {
   useEffect(() => {
     const onPop = () => {
       setArtist(artistInPath())
+      setAlbum(albumInPath())
       setFriend(friendInPath())
     }
     window.addEventListener('popstate', onPop)
@@ -74,6 +79,15 @@ export function App() {
   const openArtist = useCallback((name: string) => {
     window.history.pushState({ artist: name }, '', artistPath(name))
     setArtist(name)
+    // From an album page: the artist's page replaces it; Back brings the album back.
+    setAlbum(null)
+    window.scrollTo({ top: 0 })
+  }, [])
+
+  const openAlbum = useCallback((key: AlbumKey) => {
+    window.history.pushState({ album: key }, '', albumPath(key))
+    setAlbum(key)
+    setArtist(null)
     window.scrollTo({ top: 0 })
   }, [])
 
@@ -106,6 +120,14 @@ export function App() {
     }
   }
 
+  const closeAlbum = () => {
+    if (window.history.state?.album) window.history.back()
+    else {
+      window.history.replaceState(null, '', '/')
+      setAlbum(null)
+    }
+  }
+
   const closeFriend = () => {
     if (window.history.state?.friend) window.history.back()
     else {
@@ -115,9 +137,10 @@ export function App() {
   }
 
   const go = (next: Tab) => {
-    if (artist || friend) {
+    if (artist || album || friend) {
       window.history.pushState(null, '', '/')
       setArtist(null)
+      setAlbum(null)
       setFriend(null)
     }
     setTab(next)
@@ -136,9 +159,19 @@ export function App() {
     go('friends')
   }
 
-  const view = invite ? 'invite' : artist ? `artist:${artist}` : friend ? `friend:${friend}` : tab
+  const view = invite
+    ? 'invite'
+    : album
+      ? `album:${album.artist}/${album.name}`
+      : artist
+        ? `artist:${artist}`
+        : friend
+          ? `friend:${friend}`
+          : tab
   const screen = invite ? (
     <AddFriend invite={invite} onDone={finishInvite} />
+  ) : album ? (
+    <Album album={album} onBack={closeAlbum} />
   ) : artist ? (
     <Artist name={artist} onBack={closeArtist} />
   ) : friend ? (
@@ -158,6 +191,7 @@ export function App() {
     // Animations follow the device's "reduce motion" setting, unless Settings says reduce.
     <MotionConfig reducedMotion={settings.motion === 'reduce' ? 'always' : 'user'}>
       <OpenArtist.Provider value={openArtist}>
+        <OpenAlbum.Provider value={openAlbum}>
         <div className="min-h-screen">
           <a
             href="#main"
@@ -189,6 +223,7 @@ export function App() {
             </AnimatePresence>
           </main>
         </div>
+        </OpenAlbum.Provider>
       </OpenArtist.Provider>
     </MotionConfig>
   )

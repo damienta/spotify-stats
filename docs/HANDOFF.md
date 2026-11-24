@@ -112,10 +112,11 @@ sees them.
    because the Privacy page changes with them. Real test: add a second Spotify account in
    the dashboard's Users Management, log in with it, let the poller run for a day, then send
    an invite between the two.
-3. **Track pages.** Artist pages are done (#45): `stats_jobs/artists.py` precomputes one item
-   per top-50 artist of each range (`artist#<hash>`, see `artist_stat_name`), `GET /me/artist`
-   reads it, `web/src/screens/Artist.tsx` shows it. Track pages would follow the same pattern
-   if wanted.
+3. **Track pages.** Artist pages (#45) and album pages are done: `stats_jobs/artists.py` and
+   `stats_jobs/albums.py` precompute one item per top-50 artist or album of each range
+   (`artist#<hash>`, `album#<hash>`; see `artist_stat_name`, `album_stat_name`), `GET /me/artist`
+   and `GET /me/album` read them, `web/src/screens/Artist.tsx` and `Album.tsx` show them, sharing
+   `components/DetailParts.tsx`. Track pages would follow the same pattern if wanted.
 4. **History upload in the app.** An "Import your history" page: how to request Spotify's
    extended streaming history, a drop zone for the JSON files, progress. Optional, never needed
    to log in. The backend already reads these files (`uploads/user=<id>/`).

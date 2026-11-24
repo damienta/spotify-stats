@@ -174,6 +174,32 @@ function artist(name: string) {
     ranks: { '4_weeks': rank + 1, '6_months': rank + 2, '12_months': rank + 1, all_time: rank + 3 },
     minutes_by_month: months,
     top_tracks: TRACKS.map((t, i) => ({ name: t, artist_name: ARTISTS[rank], streams: Math.round(200 / (i + 1)), hours: total / 60 / 3 / (i + 1.5) })),
+    // The demo's top albums are named after its tracks; the first four have pages.
+    top_albums: Array.from({ length: 6 }, (_, i) => ({ name: TRACKS[(rank + i * 3) % TRACKS.length], streams: Math.round(300 / (i + 1)), hours: total / 60 / 2.5 / (i + 1.5), page: i < 4 })),
+  }
+}
+
+function album(name: string, by: string) {
+  const rank = ARTISTS.findIndex((a) => a.toLowerCase() === by.toLowerCase())
+  const title = TRACKS.find((t) => t.toLowerCase() === name.toLowerCase())
+  if (rank < 0 || !title) throw new ApiError(404, 'only your top albums have a page')
+  const page = artist(ARTISTS[rank])
+  const minutes = Math.round(page.minutes / 2.2)
+  return {
+    name: title,
+    artist_name: ARTISTS[rank],
+    minutes,
+    streams: Math.round(minutes / 3.1),
+    tracks: 9,
+    share: page.share / 2.2,
+    first_played: page.first_played,
+    first_track: TRACKS[(rank + 2) % TRACKS.length],
+    last_played: page.last_played,
+    ranks: { '4_weeks': rank + 2, '6_months': rank + 1, '12_months': rank + 3, all_time: rank + 4 },
+    minutes_by_month: page.minutes_by_month.map((m) => ({ ...m, minutes: Math.round(m.minutes / 2.2) })),
+    top_tracks: Array.from({ length: 9 }, (_, i) => ({ name: `${title} ${['', 'II', 'III', 'interlude', 'reprise', 'part 2', 'outro', 'live', 'acoustic'][i]}`.trim(), artist_name: ARTISTS[rank], streams: Math.round(180 / (i + 1)), hours: minutes / 60 / 3 / (i + 1.5) })),
+    biggest_day: { start: page.minutes_by_month.at(-2)!.start.slice(0, 8) + '14', minutes: 138 },
+    time_of_day: { Night: minutes * 0.31, Morning: minutes * 0.12, Afternoon: minutes * 0.22, Evening: minutes * 0.35 },
   }
 }
 
@@ -303,6 +329,7 @@ export async function demoApi(path: string, send?: { method: string; body?: unkn
     }
   }
   if (url.pathname === '/me/artist') return { stat_name: 'artist', generated_at: new Date().toISOString(), data: artist(url.searchParams.get('name') ?? '') }
+  if (url.pathname === '/me/album') return { stat_name: 'album', generated_at: new Date().toISOString(), data: album(url.searchParams.get('name') ?? '', url.searchParams.get('artist') ?? '') }
   const stat = url.pathname.replace('/me/stats/', '')
   const window = url.searchParams.get('window') ?? ''
   return { stat_name: stat, generated_at: new Date().toISOString(), data: data(stat, window) }
