@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 from stats_jobs.job import BUILD_MARKER, compacted_key, run_user
 
@@ -96,3 +97,24 @@ def test_unchanged_listens_are_skipped_until_the_next_day(aws, tmp_path):
 
 def test_users_without_listens_are_skipped(aws, tmp_path):
     assert run(tmp_path).skipped
+
+
+def test_pages_for_artists_and_albums_that_dropped_out_are_deleted(aws, tmp_path):
+    table = boto3.resource("dynamodb").Table("stats")
+    for name in ("artist#gone", "album#gone"):
+        table.put_item(Item={"user_id": "u1", "stat_name": name, "data": "{}"})
+    # Another user's old pages aren't touched.
+    table.put_item(Item={"user_id": "u2", "stat_name": "artist#gone", "data": "{}"})
+    put_jsonl(EXPORT, [listen(1, "export", "2026-10-01T10:00:00Z")])
+
+    result = run(tmp_path)
+
+    names = {
+        i["stat_name"] for i in table.query(KeyConditionExpression=Key("user_id").eq("u1"))["Items"]
+    }
+    assert result.removed == 2
+    assert "artist#gone" not in names and "album#gone" not in names
+    # This build's own pages stay.
+    assert any(n.startswith("artist#") for n in names)
+    assert any(n.startswith("album#") for n in names)
+    assert table.get_item(Key={"user_id": "u2", "stat_name": "artist#gone"}).get("Item")

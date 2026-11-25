@@ -185,21 +185,25 @@ function album(name: string, by: string) {
   if (rank < 0 || !title) throw new ApiError(404, 'only your top albums have a page')
   const page = artist(ARTISTS[rank])
   const minutes = Math.round(page.minutes / 2.2)
+  const top = Array.from({ length: 9 }, (_, i) => ({ name: `${title} ${['', 'II', 'III', 'interlude', 'reprise', 'part 2', 'outro', 'live', 'acoustic'][i]}`.trim(), artist_name: ARTISTS[rank], streams: Math.round(180 / (i + 1)), hours: minutes / 60 / 3 / (i + 1.5) }))
   return {
     name: title,
     artist_name: ARTISTS[rank],
     minutes,
     streams: Math.round(minutes / 3.1),
-    tracks: 9,
     share: page.share / 2.2,
     first_played: page.first_played,
     first_track: TRACKS[(rank + 2) % TRACKS.length],
     last_played: page.last_played,
     ranks: { '4_weeks': rank + 2, '6_months': rank + 1, '12_months': rank + 3, all_time: rank + 4 },
     minutes_by_month: page.minutes_by_month.map((m) => ({ ...m, minutes: Math.round(m.minutes / 2.2) })),
-    top_tracks: Array.from({ length: 9 }, (_, i) => ({ name: `${title} ${['', 'II', 'III', 'interlude', 'reprise', 'part 2', 'outro', 'live', 'acoustic'][i]}`.trim(), artist_name: ARTISTS[rank], streams: Math.round(180 / (i + 1)), hours: minutes / 60 / 3 / (i + 1.5) })),
-    biggest_day: { start: page.minutes_by_month.at(-2)!.start.slice(0, 8) + '14', minutes: 138 },
-    time_of_day: { Night: minutes * 0.31, Morning: minutes * 0.12, Afternoon: minutes * 0.22, Evening: minutes * 0.35 },
+    top_tracks: top,
+    // The record's order (the songs' suffixes), two never played.
+    tracklist: ['', 'interlude', 'II', 'part 2', 'III', 'reprise', 'B-side', 'outro', 'acoustic', 'live', 'demo'].map((suffix, i) => {
+      const name = `${title} ${suffix}`.trim()
+      const played = top.find((t) => t.name === name)
+      return { number: i + 1, disc: 1, name, hours: played?.hours ?? 0, streams: played?.streams ?? 0 }
+    }),
   }
 }
 

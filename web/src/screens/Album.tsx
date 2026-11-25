@@ -3,7 +3,8 @@ import { ArrowLeft, ExternalLink } from 'lucide-react'
 
 import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
-import { History, longDate, Ranks, Tile, Tracks } from '@/components/DetailParts'
+import { History, Ranks, Tile } from '@/components/DetailParts'
+import { MaybeLink } from '@/components/MaybeLink'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
 import { Problem, Skeleton } from '@/components/States'
@@ -14,14 +15,7 @@ import { useOpenArtist } from '@/lib/artist'
 import { count, listened, timeTile } from '@/lib/format'
 import { useAlbum } from '@/lib/queries'
 import type { AlbumPage } from '@/lib/types'
-
-// The same parts of the day as the listening clock on Stats.
-const PARTS = [
-  { key: 'Morning', label: 'morning', hours: '6am–12pm' },
-  { key: 'Afternoon', label: 'afternoon', hours: '12pm–6pm' },
-  { key: 'Evening', label: 'evening', hours: '6pm–12am' },
-  { key: 'Night', label: 'night', hours: '12am–6am' },
-] as const
+import { cn } from '@/lib/utils'
 
 function Hero({ page }: { page: AlbumPage }) {
   const openArtist = useOpenArtist()
@@ -58,56 +52,69 @@ function Hero({ page }: { page: AlbumPage }) {
   )
 }
 
-/** When in the day you play it, as one bar split four ways, plus your biggest day. */
-function WhenYouPlay({ page }: { page: AlbumPage }) {
-  const total = PARTS.reduce((sum, p) => sum + page.time_of_day[p.key], 0)
-  if (!total) return null
-  const parts = PARTS.map((p) => ({ ...p, share: page.time_of_day[p.key] / total }))
-  const most = parts.reduce((a, b) => (b.share > a.share ? b : a))
+interface Song {
+  number: number
+  name: string
+  hours: number
+  url?: string | null
+}
+
+/**
+ * The album's songs in the record's order, as a compact list: number, name, your minutes.
+ * Your most-played song is green; songs you've never played are dimmed. Until Spotify has
+ * been asked for the tracklist (usually the next hourly run), your top songs stand in.
+ */
+function Songs({ page }: { page: AlbumPage }) {
+  const inOrder = Boolean(page.tracklist?.length)
+  const songs: Song[] = inOrder
+    ? page.tracklist!
+    : page.top_tracks.map((t, i) => ({ number: i + 1, name: t.name, hours: t.hours, url: t.url }))
+  const discs = new Set(page.tracklist?.map((t) => t.disc)).size
+  const most = Math.max(...songs.map((s) => s.hours))
   return (
-    <Section title="When you play it">
-      <SpotlightCard className="space-y-4">
-        <p className="text-lg font-bold">
-          Mostly {most.key === 'Night' ? 'at' : 'in the'}{' '}
-          <span className="text-accent">{most.label}</span>
-        </p>
-        <div
-          className="flex h-3 overflow-hidden rounded-full bg-white/10"
-          role="img"
-          aria-label={parts.map((p) => `${Math.round(p.share * 100)}% ${p.label}`).join(', ')}
-        >
-          {/* Brighter green for the part of the day you play it most. */}
-          {parts.map((p) => (
-            <div
-              key={p.key}
-              className={p.key === most.key ? 'bg-accent' : 'bg-accent/35'}
-              style={{ width: `${p.share * 100}%` }}
-            />
-          ))}
-        </div>
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4" aria-hidden="true">
-          {parts.map((p) => (
-            <li key={p.key}>
-              <p className="font-semibold tabular">{Math.round(p.share * 100)}%</p>
-              <p className="text-xs text-muted">
-                {p.key} · {p.hours}
-              </p>
-            </li>
-          ))}
-        </ul>
-        {page.biggest_day && (
-          <p className="border-t border-white/10 pt-3 text-sm text-muted">
-            Your biggest day with it:{' '}
-            <span className="font-semibold text-white">{longDate(page.biggest_day.start)}</span>,{' '}
-            {listened(page.biggest_day.minutes)}.
-          </p>
-        )}
+    <Section title={inOrder ? 'Tracklist' : 'Your top songs on it'}>
+      <SpotlightCard className="p-2">
+        <ol>
+          {songs.map((s, i) => {
+            const played = s.hours > 0
+            const disc = inOrder && discs > 1 ? `${page.tracklist![i].disc}.` : ''
+            return (
+              <li key={`${disc}${s.number}-${s.name}`}>
+                <MaybeLink
+                  href={s.url}
+                  className="group flex items-baseline gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-white/5"
+                >
+                  <span className="w-7 shrink-0 text-right text-xs text-faint tabular">
+                    {disc}
+                    {s.number}
+                  </span>
+                  <span
+                    className={cn(
+                      'min-w-0 flex-1 truncate underline-offset-4 group-hover:underline',
+                      played ? 'font-semibold' : 'text-faint',
+                    )}
+                  >
+                    {s.name}
+                  </span>
+                  <span
+                    className={cn(
+                      'shrink-0 text-xs tabular',
+                      played && s.hours === most ? 'font-semibold text-accent' : 'text-muted',
+                    )}
+                  >
+                    {played ? listened(s.hours * 60) : '–'}
+                  </span>
+                </MaybeLink>
+              </li>
+            )
+          })}
+        </ol>
       </SpotlightCard>
     </Section>
   )
 }
 
-/** One of your top albums: the songs on it you play, since when, and when in the day. */
+/** One of your top albums: its songs in order with your plays, and since when. */
 export function Album({ album, onBack }: { album: AlbumKey; onBack: () => void }) {
   const page = useAlbum(album.name, album.artist)
   const notTop = page.error instanceof ApiError && page.error.status === 404
@@ -138,20 +145,16 @@ export function Album({ album, onBack }: { album: AlbumKey; onBack: () => void }
           className="space-y-8"
         >
           <Hero page={page.data} />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Tile label={timeTile(page.data.minutes).label}>{timeTile(page.data.minutes).value}</Tile>
             <Tile label="Streams">{count(page.data.streams)}</Tile>
-            <Tile label="Songs played">{count(page.data.tracks)}</Tile>
             <Tile label="Of all your listening">
               {(page.data.share * 100).toFixed(page.data.share < 0.01 ? 2 : 1)}%
             </Tile>
           </div>
           <div className="grid gap-8 lg:grid-cols-2">
-            <Tracks title="Your top songs on it" tracks={page.data.top_tracks} />
-            <div className="space-y-8">
-              <WhenYouPlay page={page.data} />
-              <History page={page.data} />
-            </div>
+            <Songs page={page.data} />
+            <History page={page.data} />
           </div>
         </motion.div>
       )}

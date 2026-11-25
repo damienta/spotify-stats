@@ -35,7 +35,6 @@ def connect_rows(tmp_path, rows):
 
 @pytest.fixture
 def con(tmp_path):
-    # London is UTC+1 in summer, so 23:30 UTC on 1 June is 00:30 on 2 June: Night.
     return connect_rows(
         tmp_path,
         [
@@ -57,7 +56,7 @@ def test_an_album_page_sums_up_its_listening(con):
 
     assert (page["name"], page["artist_name"]) == ("Debut", "A")
     assert page["minutes"] == pytest.approx(365_000 / 60_000, abs=1e-4)
-    assert (page["streams"], page["tracks"]) == (4, 3)
+    assert page["streams"] == 4
     assert page["first_played"].startswith("2025-06-01")
     assert page["first_track"] == "Opener"
     assert page["last_played"].startswith("2025-07-11")
@@ -65,14 +64,6 @@ def test_an_album_page_sums_up_its_listening(con):
     assert page["ranks"]["4_weeks"] is None
     assert [t["name"] for t in page["top_tracks"]] == ["Single", "Opener", "Skipped"]
     assert page["track_id"].startswith("Debut-")
-    # Three plays on 1-2 June London time; 10 July had the single long play.
-    assert page["biggest_day"] == {"start": "2025-07-10", "minutes": 3.0}
-    assert page["time_of_day"] == {
-        "Night": 1.0,
-        "Morning": 2.0,
-        "Afternoon": pytest.approx(185_000 / 60_000, abs=1e-4),
-        "Evening": 0.0,
-    }
 
 
 def test_albums_with_the_same_name_by_different_artists_are_different_pages(con):
@@ -127,19 +118,29 @@ def test_artist_pages_list_their_albums_and_which_have_a_page(con):
     assert len(albums) <= TOP_ALBUMS
 
 
-def test_album_pages_get_the_cover_and_link(con):
-    def fetch(path):
+def album_fetch(path):
+    if path.startswith("/albums/x/tracks"):
+        # The record's order: "Opener" first, a song never played, then "Single".
         return {
-            "external_urls": {"spotify": f"https://open.spotify.com{path}"},
-            "album": {
-                "images": [{"url": "https://i.scdn.co/cover", "width": 300}],
-                "external_urls": {"spotify": "https://open.spotify.com/album/x"},
-            },
-            "artists": [{"id": "a", "name": "A"}],
+            "items": [
+                {"track_number": 1, "disc_number": 1, "name": "Opener", "id": "id-opener"},
+                {"track_number": 2, "disc_number": 1, "name": "Deep Cut", "id": "id-deep"},
+                {"track_number": 3, "disc_number": 1, "name": "single", "id": "id-other"},
+            ]
         }
+    return {
+        "external_urls": {"spotify": f"https://open.spotify.com{path}"},
+        "album": {
+            "images": [{"url": "https://i.scdn.co/cover", "width": 300}],
+            "external_urls": {"spotify": "https://open.spotify.com/album/x"},
+        },
+        "artists": [{"id": "a", "name": "A"}],
+    }
 
+
+def test_album_pages_get_the_cover_and_link(con):
     docs = build_documents(con, "u1", NOW)
-    enrich(docs, Catalog(fetch))
+    enrich(docs, Catalog(album_fetch))
     page = docs[album_stat_name("Debut", "A")]["data"]
 
     assert page["image"] == "https://i.scdn.co/cover"
@@ -148,3 +149,24 @@ def test_album_pages_get_the_cover_and_link(con):
     assert (
         docs[artist_stat_name("A")]["data"]["top_albums"][0]["image"] == "https://i.scdn.co/cover"
     )
+
+
+def test_album_pages_get_the_tracklist_in_order_with_your_plays(con):
+    docs = build_documents(con, "u1", NOW)
+    catalog = Catalog(album_fetch)
+    enrich(docs, catalog)
+    tracklist = docs[album_stat_name("Debut", "A")]["data"]["tracklist"]
+
+    assert [(t["number"], t["name"]) for t in tracklist] == [
+        (1, "Opener"),
+        (2, "Deep Cut"),
+        (3, "single"),
+    ]
+    assert tracklist[0]["hours"] == pytest.approx(1 / 60, abs=1e-4)
+    # Never played: listed anyway, with nothing.
+    assert (tracklist[1]["hours"], tracklist[1]["streams"]) == (0, 0)
+    # Matched by name when the ids differ (single vs album version), whatever the case.
+    assert tracklist[2]["streams"] == 3
+    assert tracklist[1]["url"] == "https://open.spotify.com/track/id-deep"
+    # Cached: a second run asks Spotify for nothing.
+    assert "x" in catalog.albums
