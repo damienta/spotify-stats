@@ -192,6 +192,7 @@ function album(name: string, by: string) {
     minutes,
     streams: Math.round(minutes / 3.1),
     share: page.share / 2.2,
+    artist_minutes: page.minutes,
     first_played: page.first_played,
     first_track: TRACKS[(rank + 2) % TRACKS.length],
     last_played: page.last_played,
@@ -202,7 +203,17 @@ function album(name: string, by: string) {
     tracklist: ['', 'interlude', 'II', 'part 2', 'III', 'reprise', 'B-side', 'outro', 'acoustic', 'live', 'demo'].map((suffix, i) => {
       const name = `${title} ${suffix}`.trim()
       const played = top.find((t) => t.name === name)
-      return { number: i + 1, disc: 1, name, hours: played?.hours ?? 0, streams: played?.streams ?? 0 }
+      const hours = played?.hours ?? 0
+      // Recent listening leans to the later songs, so the range buttons change the order.
+      const lean = (i + 1) / 6
+      return {
+        number: i + 1,
+        disc: 1,
+        name,
+        hours,
+        streams: played?.streams ?? 0,
+        hours_by_range: { '4_weeks': hours * 0.08 * lean, '6_months': hours * 0.4 * lean, '12_months': hours * 0.7 },
+      }
     }),
   }
 }

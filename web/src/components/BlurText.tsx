@@ -54,7 +54,8 @@ const BlurText: React.FC<BlurTextProps> = ({
       ([entry]) => {
         if (entry.isIntersecting) {
           setInView(true);
-          observer.unobserve(ref.current as Element);
+          // Seen once is enough. (ref.current can already be gone if the page has changed.)
+          observer.disconnect();
         }
       },
       { threshold, rootMargin }

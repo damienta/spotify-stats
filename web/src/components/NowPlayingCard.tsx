@@ -1,22 +1,31 @@
-import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 
 import { clock } from '@/lib/format'
 import { useNowPlaying, useRecent } from '@/lib/queries'
+import { useSettings } from '@/lib/settings'
+import { cn } from '@/lib/utils'
 
 import { Artwork } from './Artwork'
 import SpotlightCard from './SpotlightCard'
 import { Problem, Skeleton } from './States'
 
+// Each bar at its own speed and starting point, so they don't move in step.
+const BARS = [
+  { duration: 0.9, delay: -0.3 },
+  { duration: 0.7, delay: -0.5 },
+  { duration: 1.1, delay: -0.1 },
+  { duration: 0.8, delay: -0.6 },
+]
+
 function Equalizer() {
+  const still = useSettings().motion === 'reduce'
   return (
-    <span className="flex h-3 items-end gap-[2px]" aria-hidden="true">
-      {[0, 0.2, 0.4].map((delay) => (
-        <motion.span
-          key={delay}
-          className="w-[3px] rounded-full bg-accent"
-          animate={{ height: ['30%', '100%', '45%', '80%', '30%'] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay }}
+    <span className="flex h-3.5 items-end gap-[2px]" aria-hidden="true">
+      {BARS.map((b, i) => (
+        <span
+          key={i}
+          className={cn('h-full w-[3px] rounded-full bg-accent', still ? 'scale-y-60' : 'eq-bar')}
+          style={still ? undefined : { animationDuration: `${b.duration}s`, animationDelay: `${b.delay}s` }}
         />
       ))}
     </span>

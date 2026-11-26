@@ -142,6 +142,8 @@ export interface TracklistRow {
   hours: number
   streams: number
   url?: string | null
+  /** Your hours on it in the shorter ranges; all time is `hours`. */
+  hours_by_range?: Partial<Record<RankWindow, number>>
 }
 
 export type RankWindow = '4_weeks' | '6_months' | '12_months' | 'all_time'
@@ -160,6 +162,8 @@ export interface AlbumPage {
   minutes_by_month: Period[]
   /** Your most-played songs on it. */
   top_tracks: TopRow[]
+  /** Everything you've played by the album's artist, in minutes. */
+  artist_minutes?: number
   /** The album's songs in order, with your plays (0 for unplayed). Missing until Spotify
    *  has been asked for it, usually by the next hourly run. */
   tracklist?: TracklistRow[]

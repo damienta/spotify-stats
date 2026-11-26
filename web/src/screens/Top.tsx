@@ -199,7 +199,9 @@ export function Top() {
   const [range, setRange] = useState<Range>('4_weeks')
   return (
     <div className="space-y-5">
-      <h1 className="text-3xl font-extrabold tracking-tight">Your top</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">
+        <BlurText text="Your top" delay={80} />
+      </h1>
       <Segmented options={KINDS} value={kind} onChange={setKind} />
       <Segmented options={RANGES} value={range} onChange={setRange} />
       {/* A new list starts short again. */}

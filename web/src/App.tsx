@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Nav, type Tab } from './components/Nav'
@@ -36,6 +36,16 @@ const loginError = finishLogin()
 // Then an invite from /add/<invite>, or one saved before going to log in.
 const pendingInvite = startInvite()
 
+// The app puts the scroll back itself: the browser would do it the moment Back is pressed,
+// while the old page is still fading out, so the page jumped about before the new one showed.
+if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
+
+/** Opens a page in the history, remembering how far down the one you're leaving was. */
+function push(state: object | null, url: string) {
+  window.history.replaceState({ ...window.history.state, scroll: window.scrollY }, '')
+  window.history.pushState(state, '', url)
+}
+
 function savedTab(): Tab {
   try {
     const tab = localStorage.getItem(TAB_KEY)
@@ -65,9 +75,13 @@ export function App() {
   // A friend's page works the same way at /friend/<id>; an artist page can open over it.
   const [friend, setFriend] = useState<string | null>(() => friendInPath())
   const [invite, setInvite] = useState<string | null>(pendingInvite)
+  // Where to scroll once the next page shows: the top for a new page, back where you were
+  // when going back.
+  const scrollTo = useRef(0)
 
   useEffect(() => {
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
+      scrollTo.current = e.state?.scroll ?? 0
       setArtist(artistInPath())
       setAlbum(albumInPath())
       setFriend(friendInPath())
@@ -77,24 +91,24 @@ export function App() {
   }, [])
 
   const openArtist = useCallback((name: string) => {
-    window.history.pushState({ artist: name }, '', artistPath(name))
+    push({ artist: name }, artistPath(name))
     setArtist(name)
     // From an album page: the artist's page replaces it; Back brings the album back.
     setAlbum(null)
-    window.scrollTo({ top: 0 })
+    scrollTo.current = 0
   }, [])
 
   const openAlbum = useCallback((key: AlbumKey) => {
-    window.history.pushState({ album: key }, '', albumPath(key))
+    push({ album: key }, albumPath(key))
     setAlbum(key)
     setArtist(null)
-    window.scrollTo({ top: 0 })
+    scrollTo.current = 0
   }, [])
 
   const openFriend = useCallback((userId: string) => {
-    window.history.pushState({ friend: userId }, '', friendPath(userId))
+    push({ friend: userId }, friendPath(userId))
     setFriend(userId)
-    window.scrollTo({ top: 0 })
+    scrollTo.current = 0
   }, [])
 
   // Readable whether or not you're logged in, so it can be linked from anywhere.
@@ -138,13 +152,14 @@ export function App() {
 
   const go = (next: Tab) => {
     if (artist || album || friend) {
-      window.history.pushState(null, '', '/')
+      push(null, '/')
       setArtist(null)
       setAlbum(null)
       setFriend(null)
     }
     setTab(next)
-    window.scrollTo({ top: 0 })
+    scrollTo.current = 0
+    if (next === tab) window.scrollTo({ top: 0 })
     try {
       localStorage.setItem(TAB_KEY, next)
     } catch {
@@ -171,9 +186,9 @@ export function App() {
   const screen = invite ? (
     <AddFriend invite={invite} onDone={finishInvite} />
   ) : album ? (
-    <Album album={album} onBack={closeAlbum} />
+    <Album album={album} />
   ) : artist ? (
-    <Artist name={artist} onBack={closeArtist} />
+    <Artist name={artist} />
   ) : friend ? (
     <Friend userId={friend} onBack={closeFriend} />
   ) : (
@@ -201,12 +216,21 @@ export function App() {
           </a>
           {/* A soft green glow behind the top of every page. */}
           <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(60%_80%_at_30%_0%,rgba(29,185,84,0.22),transparent_70%)]" />
-          <Nav tab={tab} onChange={go} />
+          <Nav
+            tab={tab}
+            onChange={go}
+            onBack={
+              invite ? undefined : album ? closeAlbum : artist ? closeArtist : friend ? closeFriend : undefined
+            }
+          />
           <main
             id="main"
             className="relative mx-auto max-w-3xl px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-32 md:pt-28 md:pb-12 lg:max-w-5xl"
           >
-            <AnimatePresence mode="wait">
+            <AnimatePresence
+              mode="wait"
+              onExitComplete={() => window.scrollTo({ top: scrollTo.current })}
+            >
               <motion.div
                 key={view}
                 initial={{ opacity: 0, y: 12 }}

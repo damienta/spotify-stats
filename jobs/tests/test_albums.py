@@ -170,3 +170,32 @@ def test_album_pages_get_the_tracklist_in_order_with_your_plays(con):
     assert tracklist[1]["url"] == "https://open.spotify.com/track/id-deep"
     # Cached: a second run asks Spotify for nothing.
     assert "x" in catalog.albums
+
+
+def test_album_pages_have_each_songs_minutes_for_the_shorter_ranges(con):
+    docs = build_documents(con, "u1", NOW)
+
+    recent = docs[album_stat_name("Second", "A")]["data"]
+    assert recent["track_hours"]["4_weeks"] == {"Other": pytest.approx(2 / 60, abs=1e-4)}
+    assert recent["track_hours"]["12_months"] == {"Other": pytest.approx(2 / 60, abs=1e-4)}
+    # Played over a year ago: nothing in any shorter range.
+    assert docs[album_stat_name("Debut", "A")]["data"]["track_hours"] == {}
+    # Everything by A, both albums.
+    assert recent["artist_minutes"] == pytest.approx(365_000 / 60_000 + 2, abs=1e-4)
+
+
+def test_the_tracklist_has_your_minutes_for_each_range(tmp_path):
+    con = connect_rows(
+        tmp_path,
+        [
+            listen(1, "Debut", "Opener", "2025-06-01T08:00:00Z"),
+            listen(2, "Debut", "Single", "2026-09-20T09:00:00Z", ms_played=120_000),
+        ],
+    )
+    docs = build_documents(con, "u1", NOW)
+    enrich(docs, Catalog(album_fetch))
+    tracklist = docs[album_stat_name("Debut", "A")]["data"]["tracklist"]
+
+    assert tracklist[0]["hours_by_range"]["4_weeks"] == 0
+    assert tracklist[2]["hours_by_range"]["4_weeks"] == pytest.approx(2 / 60, abs=1e-4)
+    assert tracklist[2]["hours_by_range"]["6_months"] == pytest.approx(2 / 60, abs=1e-4)

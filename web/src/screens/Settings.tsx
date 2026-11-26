@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink, LogOut, RotateCcw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
+import BlurText from '@/components/BlurText'
 import { Section } from '@/components/Section'
 import { Segmented } from '@/components/Segmented'
 import SpotlightCard from '@/components/SpotlightCard'
@@ -124,7 +125,9 @@ export function Settings() {
   const me = useMe()
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Settings</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+        <BlurText text="Settings" delay={80} />
+      </h1>
 
       <Section title="Display">
         <SpotlightCard className="space-y-5 p-5">

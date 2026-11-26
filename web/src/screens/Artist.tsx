@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, Clock, ExternalLink, Ticket } from 'lucide-react'
+import { Clock, ExternalLink, Ticket } from 'lucide-react'
 
 import { Artwork } from '@/components/Artwork'
 import BlurText from '@/components/BlurText'
@@ -130,15 +130,11 @@ function Gigs({ name }: { name: string }) {
 }
 
 /** One of your top artists: how much you play them, since when, and which songs. */
-export function Artist({ name, onBack }: { name: string; onBack: () => void }) {
+export function Artist({ name }: { name: string }) {
   const page = useArtist(name)
   const notTop = page.error instanceof ApiError && page.error.status === 404
   return (
     <div className="space-y-8">
-      <Button variant="glass" size="sm" onClick={onBack}>
-        <ArrowLeft className="size-4" />
-        Back
-      </Button>
 
       {notTop ? (
         <p className="glass rounded-2xl p-5 text-sm text-muted">
