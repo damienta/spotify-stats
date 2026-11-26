@@ -2,6 +2,7 @@ import { Check, ChevronRight, Copy, Share2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 
 import { Artwork } from '@/components/Artwork'
+import BlurText from '@/components/BlurText'
 import { Minutes } from '@/components/Minutes'
 import { Section } from '@/components/Section'
 import SpotlightCard from '@/components/SpotlightCard'
@@ -192,7 +193,9 @@ export function Friends() {
   const none = friends.data?.length === 0
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Friends</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+        <BlurText text="Friends" delay={80} />
+      </h1>
       <InviteCard first={none} />
       {friends.isError ? (
         <Problem error={friends.error} onRetry={() => friends.refetch()} />

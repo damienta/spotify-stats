@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, UserMinus } from 'lucide-react'
+import { UserMinus } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 
 import { Artwork } from '@/components/Artwork'
@@ -190,10 +190,6 @@ export function Friend({ userId, onBack }: { userId: string; onBack: () => void 
   const s = summary.data
   return (
     <div className="space-y-8">
-      <Button variant="glass" size="sm" onClick={onBack}>
-        <ArrowLeft className="size-4" />
-        Back
-      </Button>
 
       {gone ? (
         <p className="glass rounded-2xl p-5 text-sm text-muted">

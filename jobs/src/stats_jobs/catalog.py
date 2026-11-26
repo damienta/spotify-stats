@@ -307,6 +307,11 @@ def add_tracklists(documents: dict[str, dict[str, Any]], catalog: Catalog) -> No
                 "url": f"https://open.spotify.com/track/{s['id']}" if s.get("id") else None,
                 "hours": played.get("hours", 0),
                 "streams": played.get("streams", 0),
+                # Your hours on it in each shorter range, for the range buttons.
+                "hours_by_range": {
+                    window: hours.get(played.get("name"), 0)
+                    for window, hours in (page.get("track_hours") or {}).items()
+                },
             }
             for s in songs
             for played in [by_id.get(s.get("id")) or by_name.get(_song(s["name"])) or {}]

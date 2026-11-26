@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChartLine, House, LogOut, Settings, Ticket, Trophy, Users } from 'lucide-react'
+import { ArrowLeft, ChartLine, House, LogOut, Settings, Ticket, Trophy, Users } from 'lucide-react'
 
 import { logout } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -47,8 +47,20 @@ function Corner({
   )
 }
 
-/** A glass tab bar: along the bottom on phones (in thumb reach), across the top on wider screens. */
-export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
+/**
+ * A glass tab bar: along the bottom on phones (in thumb reach), across the top on wider screens.
+ * On an artist, album or friend's page, Back takes the logo's place (top left on phones), so it
+ * isn't a button sitting on top of the page.
+ */
+export function Nav({
+  tab,
+  onChange,
+  onBack,
+}: {
+  tab: Tab
+  onChange: (tab: Tab) => void
+  onBack?: () => void
+}) {
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 h-28 md:hidden">
@@ -62,6 +74,18 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
         onChange={onChange}
         className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 md:hidden"
       />
+      {onBack && (
+        <Button
+          variant="glass"
+          size="icon"
+          onClick={onBack}
+          aria-label="Back"
+          title="Back"
+          className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 z-20 md:hidden"
+        >
+          <ArrowLeft className="size-4" />
+        </Button>
+      )}
       <nav
         className={cn(
           'glass fixed z-20 flex items-center rounded-full p-1.5',
@@ -69,10 +93,23 @@ export function Nav({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void 
           'md:inset-x-6 md:top-4 md:bottom-auto md:mx-auto md:max-w-5xl md:justify-between md:pl-4',
         )}
       >
-        <div className="hidden items-center gap-2 md:flex">
-          <img src="/icon.svg" alt="" className="size-7" />
-          <span className="font-bold">Stats</span>
-        </div>
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="hidden items-center gap-2 rounded-full py-1 pr-3 font-bold transition-colors hover:text-accent md:flex"
+          >
+            <span className="grid size-7 place-items-center rounded-full bg-white/10">
+              <ArrowLeft className="size-4" />
+            </span>
+            Back
+          </button>
+        ) : (
+          <div className="hidden items-center gap-2 md:flex">
+            <img src="/icon.svg" alt="" className="size-7" />
+            <span className="font-bold">Stats</span>
+          </div>
+        )}
         <div className="flex flex-1 justify-around md:flex-none md:gap-1">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button

@@ -90,7 +90,7 @@ def build_documents(
         for name, data in window_stats(con, window).items():
             stats[f"{name}#{window.name}"] = data
     stats["streaks"] = streaks(con, today=now.astimezone(LOCAL_TZ).date())
-    albums = album_pages(con, stats)
+    albums = album_pages(con, stats, windows)
     stats.update(albums)
     stats.update(artist_pages(con, stats, albums))
     for y in years_listened(con):
