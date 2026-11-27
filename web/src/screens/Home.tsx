@@ -25,8 +25,8 @@ function Header() {
         <span className="sr-only">
           {greeting()}, {name}
         </span>
-        <BlurText text={`${greeting()},`} delay={80} />
-        {name && <BlurText key={name} text={name} delay={80} className="text-accent" />}
+        <BlurText text={`${greeting()},`} delay={0} />
+        {name && <BlurText key={name} text={name} delay={0} className="text-accent" />}
       </h1>
     </header>
   )

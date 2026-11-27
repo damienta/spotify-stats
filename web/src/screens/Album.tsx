@@ -32,7 +32,7 @@ function Hero({ page }: { page: AlbumPage }) {
       <div className="min-w-0 flex-1 space-y-3">
         <p className="text-xs font-semibold text-accent uppercase">Album</p>
         <h1 className="text-4xl font-extrabold tracking-tight break-words sm:text-5xl">
-          <BlurText key={page.name} text={page.name} delay={60} className="justify-center sm:justify-start" />
+          <BlurText key={page.name} text={page.name} delay={0} className="justify-center sm:justify-start" />
         </h1>
         <button
           type="button"

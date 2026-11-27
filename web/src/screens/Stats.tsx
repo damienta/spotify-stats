@@ -272,7 +272,7 @@ export function Stats() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2 pr-12">
         <h1 className="text-3xl font-extrabold tracking-tight">
-          <BlurText text="Your stats" delay={80} />
+          <BlurText text="Your stats" delay={0} />
         </h1>
         <Freshness period={period} />
       </div>
