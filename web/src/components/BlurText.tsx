@@ -42,7 +42,8 @@ const BlurText: React.FC<BlurTextProps> = ({
   animationTo,
   easing = (t: number) => t,
   onAnimationComplete,
-  stepDuration = 0.35
+  // Two steps of 0.3s: 0.6s, like everything else (lib/motion.ts).
+  stepDuration = 0.3
 }) => {
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
   const [inView, setInView] = useState(false);

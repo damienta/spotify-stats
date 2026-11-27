@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import React, { useRef, useState } from 'react';
 
+import { fadeFrom, fadeTo, fadeTransition } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 interface Position {
@@ -53,10 +54,10 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
   return (
     <motion.div
       ref={divRef}
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={fadeFrom}
+      whileInView={fadeTo}
       viewport={{ once: true, margin: '0px 0px -40px 0px' }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={fadeTransition}
       onMouseMove={handleMouseMove}
       onFocus={handleFocus}
       onBlur={handleBlur}

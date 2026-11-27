@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { useOpenArtist } from '@/lib/artist'
 import { count } from '@/lib/format'
+import { fadeTransition } from '@/lib/motion'
 import { useCompare, useFriendSummary, useRemoveFriend } from '@/lib/queries'
 import type { Compare, PublicRow } from '@/lib/types'
 
@@ -205,9 +206,9 @@ export function Friend({ userId, onBack }: { userId: string; onBack: () => void 
         </div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={fadeTransition}
           className="space-y-8"
         >
           <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">

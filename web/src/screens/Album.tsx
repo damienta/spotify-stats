@@ -15,6 +15,7 @@ import type { AlbumKey } from '@/lib/album'
 import { ApiError } from '@/lib/api'
 import { useOpenArtist } from '@/lib/artist'
 import { count, listened, timeTile } from '@/lib/format'
+import { fadeTransition } from '@/lib/motion'
 import { useAlbum } from '@/lib/queries'
 import type { AlbumPage, RankWindow } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -252,9 +253,9 @@ export function Album({ album }: { album: AlbumKey }) {
         </div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={fadeTransition}
           className="space-y-8"
         >
           <Hero page={page.data} />
