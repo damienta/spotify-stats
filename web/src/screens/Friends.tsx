@@ -194,7 +194,7 @@ export function Friends() {
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-        <BlurText text="Friends" delay={80} />
+        <BlurText text="Friends" delay={0} />
       </h1>
       <InviteCard first={none} />
       {friends.isError ? (

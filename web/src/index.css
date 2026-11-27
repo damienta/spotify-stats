@@ -88,9 +88,9 @@ body {
   animation: eq ease-in-out infinite;
 }
 
-/* List rows un-blur into place one after another, like the cards around them
-   (lib/motion.ts); rows added later, such as "Show more", do the same. `backwards` only
-   holds the start until each row's turn, so nothing is left overriding framer-motion. */
+/* List rows un-blur into place with everything else (lib/motion.ts), all at once; rows
+   added later, such as "Show more", do the same. `backwards` only holds the start state,
+   so nothing is left overriding framer-motion afterwards. */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -102,16 +102,6 @@ body {
 main li {
   animation: fade-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
-
-main li:nth-child(2) { animation-delay: 0.05s; }
-main li:nth-child(3) { animation-delay: 0.1s; }
-main li:nth-child(4) { animation-delay: 0.15s; }
-main li:nth-child(5) { animation-delay: 0.2s; }
-main li:nth-child(6) { animation-delay: 0.25s; }
-main li:nth-child(7) { animation-delay: 0.3s; }
-main li:nth-child(8) { animation-delay: 0.35s; }
-main li:nth-child(9) { animation-delay: 0.4s; }
-main li:nth-child(n + 10) { animation-delay: 0.45s; }
 
 /* Settings > Reduce motion. */
 .reduce-motion main li {

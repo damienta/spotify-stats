@@ -126,7 +126,7 @@ export function Settings() {
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-        <BlurText text="Settings" delay={80} />
+        <BlurText text="Settings" delay={0} />
       </h1>
 
       <Section title="Display">

@@ -105,7 +105,7 @@ function Leader({ row, kind }: { row: TopRow; kind: Kind }) {
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-accent">#1</p>
           <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-            <BlurText key={row.name} text={row.name} delay={60} />
+            <BlurText key={row.name} text={row.name} delay={0} />
           </h2>
           {row.artist_name && <p className="truncate text-muted">{row.artist_name}</p>}
         </div>
@@ -200,7 +200,7 @@ export function Top() {
   return (
     <div className="space-y-5">
       <h1 className="text-3xl font-extrabold tracking-tight">
-        <BlurText text="Your top" delay={80} />
+        <BlurText text="Your top" delay={0} />
       </h1>
       <Segmented options={KINDS} value={kind} onChange={setKind} />
       <Segmented options={RANGES} value={range} onChange={setRange} />

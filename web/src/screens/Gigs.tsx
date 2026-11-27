@@ -104,7 +104,7 @@ export function Gigs() {
     <div className="space-y-6">
       <header className="space-y-1">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-          <BlurText text="Your gigs" delay={80} />
+          <BlurText text="Your gigs" delay={0} />
         </h1>
         <p className="text-sm text-muted">
           UK dates for your top artists, from Ticketmaster. Checked every day.
