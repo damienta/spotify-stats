@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { Clock, Ticket } from 'lucide-react'
 import { useState } from 'react'
 
@@ -36,13 +35,8 @@ function Row({ row, now }: { row: GigRow; now: number }) {
   const tickets = ticketState(gig, now)
   const openArtist = useOpenArtist()
   return (
-    <motion.li
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="glass flex items-center gap-3 rounded-2xl p-3 sm:gap-4"
-    >
+    // Fades in like every list row (index.css).
+    <li className="glass flex items-center gap-3 rounded-2xl p-3 sm:gap-4">
       <div className="w-12 shrink-0 text-center leading-tight">
         <p className="text-[11px] font-bold text-accent uppercase">
           {day.toLocaleDateString('en-GB', { weekday: 'short' })}
@@ -79,7 +73,7 @@ function Row({ row, now }: { row: GigRow; now: number }) {
         </a>
         {tickets.note && <p className="hidden text-xs text-muted sm:block">{tickets.note}</p>}
       </div>
-    </motion.li>
+    </li>
   )
 }
 

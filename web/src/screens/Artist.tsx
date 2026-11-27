@@ -13,6 +13,7 @@ import { useOpenAlbum } from '@/lib/album'
 import { ApiError } from '@/lib/api'
 import { count, gigDate, listened, timeTile } from '@/lib/format'
 import { ticketState } from '@/lib/gigs'
+import { fadeTransition } from '@/lib/motion'
 import { useArtist, useStat } from '@/lib/queries'
 import type { AlbumRow, ArtistPage, Touring } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -151,9 +152,9 @@ export function Artist({ name }: { name: string }) {
         </div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={fadeTransition}
           className="space-y-8"
         >
           <Hero page={page.data} />

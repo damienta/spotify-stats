@@ -8,7 +8,9 @@ import { finishLogin, getToken } from './lib/api'
 import { type AlbumKey, OpenAlbum, albumInPath, albumPath } from './lib/album'
 import { OpenArtist, artistInPath, artistPath } from './lib/artist'
 import { OpenFriend, forgetInvite, friendInPath, friendPath, startInvite } from './lib/friends'
+import { fadeTransition } from './lib/motion'
 import { useSettings } from './lib/settings'
+import { cn } from './lib/utils'
 
 // Each screen is its own download, so the first visit only loads what it shows: the login
 // screen's WebGL aurora and the Stats charts aren't fetched until they're needed.
@@ -207,7 +209,7 @@ export function App() {
     <MotionConfig reducedMotion={settings.motion === 'reduce' ? 'always' : 'user'}>
       <OpenArtist.Provider value={openArtist}>
         <OpenAlbum.Provider value={openAlbum}>
-        <div className="min-h-screen">
+        <div className={cn('min-h-screen', settings.motion === 'reduce' && 'reduce-motion')}>
           <a
             href="#main"
             className="sr-only z-30 rounded-full bg-accent px-4 py-2 font-semibold text-black focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
@@ -233,10 +235,10 @@ export function App() {
             >
               <motion.div
                 key={view}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: fadeTransition }}
+                // Leaving stays quick, so the next page isn't kept waiting.
+                exit={{ opacity: 0, transition: { duration: 0.2 } }}
               >
                 <ErrorBoundary key={view}>
                   <Suspense fallback={<Loading />}>
